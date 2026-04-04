@@ -39,12 +39,31 @@ def callback(call):
 
 @bot.message_handler(content_types=['document'])
 def handle_doc(message):
-    if message.document.mime_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-        file_info = bot.get_file(message.document.file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
-        wb = openpyxl.load_workbook(file_info=file_info.file_path.encode())
-        # Парсинг Excel в БД
-        bot.reply_to(message, "✅ База загружена!")
+    try:
+        if 'openpyxl' in message.document.mime_type or message.document.file_name.endswith('.xlsx'):
+            file_info = bot.get_file(message.document.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+            
+            # Сохраняем временно
+            with open('temp.xlsx', 'wb') as f:
+                f.write(downloaded_file)
+            
+            # Парсим
+            wb = openpyxl.load_workbook('temp.xlsx')
+            ws = wb.active
+            cursor.execute("DELETE FROM numbers WHERE user_id=?", (message.from_user.id,))
+            
+            for row in ws.iter_rows(min_row=2, values_only=True):  # Пропуск заголовка
+                if len(row) >= 1 and row[0]:  # phone в 1-й колонке
+                    cursor.execute("INSERT INTO numbers (phone, name, note, user_id) VALUES (?, ?, ?, ?)",
+                                 (str(row[0]), row[1] if len(row)>1 else '', row[2] if len(row)>2 else '', message.from_user.id))
+            conn.commit()
+            
+            # Удаляем temp
+            os.remove('temp.xlsx')
+            bot.reply_to(message, f"✅ Загружено {cursor.rowcount} номеров!")
+    except Exception as e:
+        bot.reply_to(message, f"❌ Ошибка: {str(e)}")
 
 print("SpeedCaller запущен!")
 bot.polling(none_stop=True)
