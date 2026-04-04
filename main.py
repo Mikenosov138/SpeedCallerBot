@@ -4,7 +4,8 @@ import openpyxl
 import sqlite3
 import os
 
-TOKEN = '8539274936:AAEGLJBhLg51aNkjIJHJw4TP-W4oZZd1u04'  # Замени на реальный!
+import os
+TOKEN = os.getenv('BOT_TOKEN')  # Замени на реальный!
 bot = telebot.TeleBot(TOKEN)
 
 # БД
