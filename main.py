@@ -1,3 +1,12 @@
+print("=== BOT START ===")
+import telebot
+print("Telebot OK")
+import os
+print("OS OK")
+import sqlite3
+print("SQLite OK")
+TOKEN = os.getenv("BOT_TOKEN")
+print(f"TOKEN: {'OK' if TOKEN else 'MISSING'}")
 import telebot
 import os
 import sqlite3
