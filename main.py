@@ -67,3 +67,59 @@ def start_handler(message):
 ✅ *COMPLETELY FREE!*
 
 📥 *Upload database* (.xlsx **OR** text):
+
+📱 *Numbers MUST start with +* (11-13 chars total)
+
+👆 Press 📞 *Call* to start!"""
+    
+    markup = get_main_markup()
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
+    logger.info(f"User {user_id} started bot")
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    
+    try:
+        bot.delete_message(chat_id, call.message.message_id)
+    except:
+        pass
+    
+    if call.data == "call":
+        total = get_user_stats(user_id)
+        phone_result = get_next_phone(user_id)
+        
+        if phone_result and total > 0:
+            phone = phone_result[0]
+            text = f"""🚀 *Welcome to SpeedCaller Bot!*
+💪 *Make speed calls*
+
+📊 *Client:* `1/{total}`
+📱 *Number:* `{phone}`"""
+            
+            markup = InlineKeyboardMarkup(row_width=2)
+            markup.add(InlineKeyboardButton("📞 *CALL NOW*", url=f"tel:{phone}"))
+            markup.add(InlineKeyboardButton("➡️ Skip", callback_data="skip"))
+            markup.add(InlineKeyboardButton("↩️ Back", callback_data="back"))
+            
+            bot.send_message(chat_id, text, reply_markup=markup, parse_mode='Markdown')
+        else:
+            markup = get_main_markup()
+            bot.send_message(chat_id, f"📭 *No numbers* ({total})\nUpload database first!", 
+                           reply_markup=markup, parse_mode='Markdown')
+    
+    elif call.data == "skip":
+        delete_oldest_phone(user_id)
+        total = get_user_stats(user_id)
+        markup = get_main_markup()
+        bot.send_message(chat_id, f"✅ *Skipped!*\n📊 *Remaining:* `{total}`", 
+                        reply_markup=markup, parse_mode='Markdown')
+    
+    elif call.data == "back":
+        markup = get_main_markup()
+        bot.send_message(chat_id, "↩️ *Back to menu*", reply_markup=markup, parse_mode='Markdown')
+    
+    elif call.data == "settings":
+        markup = InlineKeyboardMarkup(row_width=1)
+        markup
