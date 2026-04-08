@@ -416,3 +416,49 @@ def import_excel_numbers(user_id, file_bytes):
     return added
 
 print("🚀 SpeedCallerBot v2 - PART 4 READY (TEXT + EXCEL)")
+
+# ===== ЧАСТЬ 5: TELEGRAM CALL + RESET + FINISH =====
+
+@bot.callback_query_handler(func=lambda call: call.data == "call_phone")
+def call_phone(call):
+    """Telegram звонок на номер"""
+    user_id = call.from_user.id
+    state = user_states.get(user_id, {})
+    
+    if state.get('current_number'):
+        # Telegram call URL
+        call_url = f"tg://call?phone={state['current_number'].replace('+', '').replace('-', '').replace(' ', '')}"
+        
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("☎️ CALL AGAIN", callback_data="call"))
+        markup.row(InlineKeyboardButton("⏭️ NEXT", callback_data="skip"))
+        
+        text = f"📞 CALLING...\n{state['current_number']}\n\n✅ Marked as CALLED"
+        cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (state['current_id'],))
+        conn.commit()
+        
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)
+
+@bot.message_handler(commands=["reset"])
+def reset_db(message):
+    """Сброс базы для пользователя"""
+    user_id = message.from_user.id
+    cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
+    conn.commit()
+    user_states[user_id] = {'position': 0}
+    bot.reply_to(message, "🔄 Database RESET! Send new numbers.")
+
+# Добавляем кнопку CALL в CALL handler (строка в ЧАСТИ 3)
+# В markup CALL замени:
+# InlineKeyboardButton("☎️ CALL", callback_data="call_phone")  # вместо "call"
+
+# ФИНАЛЬНЫЙ POLLING с обработкой ошибок
+if __name__ == "__main__":
+    logger.info("🚀 SpeedCallerBot v2 FULL STARTING...")
+    while True:
+        try:
+            bot.infinity_polling(timeout=10, long_polling_timeout=5)
+        except Exception as e:
+            logger.error(f"Polling error: {e}")
+            time.sleep(15)
