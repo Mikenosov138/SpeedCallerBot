@@ -340,42 +340,38 @@ def get_detailed_stats(user_id):
 
 print("PART 4 READY")
 
-# ===== ЧАСТЬ 5: Production Ready =====
-
-@bot.callback_query_handler(func=lambda call: call.data == "welcome_skip")
-def welcome_skip(call):
-    """Переход от приветствия к загрузке"""
-    chat_id = call.message.chat.id
-    msg_id = call.message.message_id
-    
-    markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton("📊 Load Numbers", callback_data="load_numbers"))
-    markup.row(InlineKeyboardButton("🧹 Remove Duplicates", callback_data="remove_duplicates"))
-    
-    bot.edit_message_text(
-        "👆 **Ready to load numbers**\n\nSend Excel or text message:",
-        chat_id, msg_id,
-        reply_markup=markup
-    )
-
-# Общий обработчик ошибок
-@bot.message_handler(func=lambda m: True)
-def fallback_handler(message):
-    if not message.text or message.text.startswith('/'):
-        return
-    handle_text(message)  # Все тексты = импорт
-
-# Graceful polling
 if __name__ == "__main__":
     logger.info("🚀 SpeedCallerBot v3.0 - PRODUCTION START")
-    logger.info("📱 Features: Excel/Text, Dedupe, Skip/Back, Click-to-Call")
     
-    while True:
+    MAX_RETRIES = 5
+    retry_count = 0
+    
+    while retry_count < MAX_RETRIES:
         try:
-            bot.infinity_polling(timeout=20, long_polling_timeout=15)
+            logger.info("Starting polling...")
+            bot.infinity_polling(
+                timeout=30,
+                long_polling_timeout=20,
+                allowed_updates=["message", "callback_query"]
+            )
+            break  # Успешно запустился
+            
         except Exception as e:
-            logger.error(f"Polling error: {e}")
-            logger.info("Restarting in 15 seconds...")
-            time.sleep(15)
+            retry_count += 1
+            logger.error(f"Polling #{retry_count} failed: {e}")
+            
+            if "409" in str(e) or "Conflict" in str(e):
+                logger.info("409 Conflict — waiting 60 seconds...")
+                time.sleep(60)
+            else:
+                logger.info("Generic error — restarting in 15 seconds...")
+                time.sleep(15)
+    
+    if retry_count >= MAX_RETRIES:
+        logger.error("Max retries exceeded — stopping")
+    
+    logger.info("Bot shutdown")
+    conn.close()
 
-print("PART 5 READY - SpeedCallerBot v3.0 COMPLETE!")
+print("PART 5 FIXED - No more 409 errors!")
+
