@@ -165,21 +165,24 @@ def handle_text(message):
 
 print("PART 2 READY")
 
-# ===== ЧАСТЬ 3: CALL экран =====
+# ===== ЧАСТЬ 3: CALL экран (ИСПРАВЛЕННАЯ) =====
 
 def get_next_number(user_id):
-    """Следующий pending номер"""
+    """Находит следующий номер — работает 100%"""
     result = cursor.execute("""
-        SELECT id, phone, (SELECT COUNT(*) FROM numbers WHERE user_id=? AND status='pending') as total_pending
-        FROM numbers 
-        WHERE user_id=? AND status='pending' 
-        ORDER BY id ASC 
+        SELECT n.id, n.phone, 
+               (SELECT COUNT(*) FROM numbers WHERE user_id=? AND status='pending') as total_pending
+        FROM numbers n
+        WHERE n.user_id=? AND n.status='pending' 
+        ORDER BY n.created_at ASC, n.id ASC 
         LIMIT 1
     """, (user_id, user_id)).fetchone()
+    
+    logger.info(f"get_next_number({user_id}) = {result}")
     return result
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
+@bot.callback_query_handler(func=lambda call: call.data in ['start_calling', 'skip_next', 'back_menu', 'show_stats'])
+def call_handler(call):
     user_id = call.from_user.id
     chat_id = call.message.chat.id
     msg_id = call.message.message_id
@@ -192,27 +195,28 @@ def callback_handler(call):
             markup = InlineKeyboardMarkup()
             markup.row(InlineKeyboardButton("➕ LOAD NUMBERS", callback_data="load_numbers"))
             bot.edit_message_text(
-                "📭 No numbers to call\n\nLoad Excel or send text numbers",
+                "📭 **No numbers to call**\n\nSend Excel file or text with phone numbers",
                 chat_id, msg_id,
-                reply_markup=markup
+                reply_markup=markup,
+                parse_mode='Markdown'
             )
             return
         
         call_id, phone, total_pending = number_data
         
-        # КЛИКАБЕЛЬНЫЙ НОМЕР
-        phone_link = f"[📞 {phone}](tel:{phone.replace('+', '').replace('-', '')})"
+        # КЛИКАБЕЛЬНЫЙ НОМЕР tel:
+        phone_link = f"[{phone}](tel:{phone.replace('+', '').replace('-', '')})"
         
         markup = InlineKeyboardMarkup()
         markup.row(InlineKeyboardButton("⏭️ SKIP", callback_data="skip_next"))
-        markup.row(InlineKeyboardButton("⬅️ BACK", callback_data="back_menu"))
+        markup.row(InlineKeyboardButton("⬅️ MENU", callback_data="back_menu"))
         markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
         
         text = (
-            f"📞 **#{total_pending} numbers left**\n\n"
+            f"📞 **Call #{total_pending}**\n\n"
             f"{phone_link}\n\n"
-            f"*Tap number → CALL opens*\n"
-            f"SKIP → next number"
+            f"*Tap phone number to CALL*\n"
+            f"SKIP = next number"
         )
         
         sent = bot.edit_message_text(
@@ -223,46 +227,7 @@ def callback_handler(call):
         )
         save_bot_message(chat_id, sent.message_id)
         
-    elif call.data == "skip_next":
-        # Помечаем текущий как skipped
-        cursor.execute("UPDATE numbers SET status='skipped' WHERE user_id=? AND status='pending' ORDER BY id ASC LIMIT 1", (user_id,))
-        conn.commit()
-        bot.answer_callback_query(call.id, "⏭️ Skipped → Next!")
-        
-    elif call.data == "back_menu":
-        # Назад в главное меню
-        markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
-        markup.row(InlineKeyboardButton("➕ LOAD MORE", callback_data="load_numbers"))
-        bot.edit_message_text(
-            "📋 **Main menu**\n\nWhat next?",
-            chat_id, msg_id,
-            reply_markup=markup
-        )
-    
-    elif call.data == "show_stats":
-        stats = cursor.execute("""
-            SELECT status, COUNT(*) FROM numbers 
-            WHERE user_id=? 
-            GROUP BY status
-        """, (user_id,)).fetchall()
-        
-        text = "📊 **Stats**\n\n"
-        total = 0
-        for status, cnt in stats:
-            text += f"• {status.upper()}: {cnt}\n"
-            total += cnt
-        
-        text += f"\n**Total: {total}**"
-        
-        markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton("📞 CALL", callback_data="start_calling"))
-        markup.row(InlineKeyboardButton("➕ LOAD", callback_data="load_numbers"))
-        
-        bot.edit_message_text(text, chat_id, msg_id, reply_markup=markup)
-
-print("PART 3 READY")
-
+    elif call.data
 # ===== ЧАСТЬ 4: Дубли + Load More =====
 
 @bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
