@@ -341,37 +341,29 @@ def get_detailed_stats(user_id):
 print("PART 4 READY")
 
 if __name__ == "__main__":
-    logger.info("🚀 SpeedCallerBot v3.0 - PRODUCTION START")
+    import requests
     
-    MAX_RETRIES = 5
-    retry_count = 0
+    # HARSH RESET Telegram updates
+    try:
+        requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset=-1")
+        logger.info("Telegram updates reset")
+        time.sleep(3)
+    except:
+        pass
     
-    while retry_count < MAX_RETRIES:
+    logger.info("🚀 SpeedCallerBot v3.0 START")
+    
+    while True:
         try:
-            logger.info("Starting polling...")
-            bot.infinity_polling(
-                timeout=30,
-                long_polling_timeout=20,
-                allowed_updates=["message", "callback_query"]
+            bot.polling(
+                non_stop=True,
+                interval=1,
+                timeout=20
             )
-            break  # Успешно запустился
-            
         except Exception as e:
-            retry_count += 1
-            logger.error(f"Polling #{retry_count} failed: {e}")
-            
-            if "409" in str(e) or "Conflict" in str(e):
-                logger.info("409 Conflict — waiting 60 seconds...")
-                time.sleep(60)
+            logger.error(f"Polling error: {e}")
+            if "409" in str(e):
+                logger.info("409 detected — hard reset in 120 sec")
+                time.sleep(120)
             else:
-                logger.info("Generic error — restarting in 15 seconds...")
                 time.sleep(15)
-    
-    if retry_count >= MAX_RETRIES:
-        logger.error("Max retries exceeded — stopping")
-    
-    logger.info("Bot shutdown")
-    conn.close()
-
-print("PART 5 FIXED - No more 409 errors!")
-
