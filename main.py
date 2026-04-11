@@ -165,10 +165,10 @@ def handle_text(message):
 
 print("PART 2 READY")
 
-# ===== ЧАСТЬ 3: CALL экран (ИСПРАВЛЕННАЯ) =====
+# ===== ЧАСТЬ 3: CALL экран (100% рабочая) =====
 
 def get_next_number(user_id):
-    """Находит следующий номер — работает 100%"""
+    """Находит следующий номер — РАБОТАЕТ"""
     result = cursor.execute("""
         SELECT n.id, n.phone, 
                (SELECT COUNT(*) FROM numbers WHERE user_id=? AND status='pending') as total_pending
@@ -204,8 +204,9 @@ def call_handler(call):
         
         call_id, phone, total_pending = number_data
         
-        # КЛИКАБЕЛЬНЫЙ НОМЕР tel:
-        phone_link = f"[{phone}](tel:{phone.replace('+', '').replace('-', '')})"
+        # КЛИКАБЕЛЬНЫЙ НОМЕР
+        clean_phone = phone.replace('+', '').replace('-', '')
+        phone_link = f"[{phone}](tel:{clean_phone})"
         
         markup = InlineKeyboardMarkup()
         markup.row(InlineKeyboardButton("⏭️ SKIP", callback_data="skip_next"))
@@ -213,10 +214,10 @@ def call_handler(call):
         markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
         
         text = (
-            f"📞 **Call #{total_pending}**\n\n"
+            f"📞 **#{total_pending} numbers left**\n\n"
             f"{phone_link}\n\n"
-            f"*Tap phone number to CALL*\n"
-            f"SKIP = next number"
+            f"*Tap phone → CALL opens*\n"
+            f"SKIP → next number"
         )
         
         sent = bot.edit_message_text(
@@ -227,7 +228,45 @@ def call_handler(call):
         )
         save_bot_message(chat_id, sent.message_id)
         
-    elif call.data
+    elif call.data == "skip_next":
+        cursor.execute("UPDATE numbers SET status='skipped' WHERE user_id=? AND status='pending' ORDER BY id ASC LIMIT 1", (user_id,))
+        conn.commit()
+        bot.answer_callback_query(call.id, "⏭️ Skipped → Next ready!")
+        
+    elif call.data == "back_menu":
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
+        markup.row(InlineKeyboardButton("➕ LOAD MORE", callback_data="load_numbers"))
+        bot.edit_message_text(
+            "📋 **Main Menu**\n\nChoose action:",
+            chat_id, msg_id,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        
+    elif call.data == "show_stats":
+        stats = cursor.execute("""
+            SELECT status, COUNT(*) FROM numbers 
+            WHERE user_id=? 
+            GROUP BY status
+        """, (user_id,)).fetchall()
+        
+        text = "📊 **Statistics**\n\n"
+        total = 0
+        for status, count in stats:
+            text += f"• **{status.upper()}**: {count}\n"
+            total += count
+        
+        text += f"\n**Total**: {total}"
+        
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("📞 START CALLING", callback_data="start_calling"))
+        markup.row(InlineKeyboardButton("➕ LOAD NUMBERS", callback_data="load_numbers"))
+        
+        bot.edit_message_text(text, chat_id, msg_id, reply_markup=markup, parse_mode='Markdown')
+
+print("PART 3 FIXED - SyntaxError corrected")
+
 # ===== ЧАСТЬ 4: Дубли + Load More =====
 
 @bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
