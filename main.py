@@ -1,4 +1,3 @@
-# SpeedCallerBot v4 — Надёжная версия
 import os
 import re
 import sqlite3
@@ -10,14 +9,12 @@ import openpyxl
 import tempfile
 import requests
 
-# Логи
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
 
-# База с UNIQUE номерами
 conn = sqlite3.connect("speedcaller_v4.db", check_same_thread=False)
 cursor = conn.cursor()
 cursor.execute("""
@@ -65,13 +62,11 @@ def main_menu_keyboard():
 def start_handler(message):
     delete_last_message(message.chat.id)
     sent = bot.send_message(message.chat.id, WELCOME_TEXT, reply_markup=main_menu_keyboard(), parse_mode='Markdown')
-    last_messages[message.chat.id] = sent.message_id  # ✅ ИСПРАВЛЕНО
+    last_messages[message.chat.id] = sent.message_id
 
-# ===== Импорт номеров =====
 def normalize_phone(phone):
-    clean = re.sub(r'[^\d+]', '', str(phone))  # ✅ ИСПРАВЛЕНО \\d → \d
-    if len(clean) < 8:
-        return None
+    clean = re.sub(r'[^\d+]', '', str(phone))
+    if len(clean) < 8: return None
     if clean.startswith('8') and len(clean) == 11:
         clean = '7' + clean[1:]
     if not clean.startswith('+'):
@@ -88,12 +83,9 @@ def import_numbers(user_id, data, source="manual"):
             for ws in wb.worksheets:
                 for row in ws.iter_rows(values_only=True):
                     for cell in row:
-                        if cell:
-                            numbers.append(str(cell))
-        except Exception as e:
-            logger.error(f"Excel error: {e}")
-            return 0
-    else:  # text
+                        if cell: numbers.append(str(cell))
+        except: return 0
+    else:
         numbers = [line.strip() for line in data.split('\n') if line.strip()]
     
     for phone in numbers:
@@ -101,62 +93,41 @@ def import_numbers(user_id, data, source="manual"):
         if norm_phone:
             try:
                 cursor.execute("INSERT OR IGNORE INTO numbers (user_id, phone) VALUES (?, ?)", (user_id, norm_phone))
-                if cursor.rowcount > 0:
-                    count_added += 1
-            except:
-                pass
-    
+                if cursor.rowcount > 0: count_added += 1
+            except: pass
     conn.commit()
     return count_added
 
-# ===== Навигация =====
 def get_user_numbers(user_id):
-    cursor.execute("""
-    SELECT id, phone FROM numbers 
-    WHERE user_id=? AND status='pending' 
-    ORDER BY created_at ASC
-    """, (user_id,))
+    cursor.execute("SELECT id, phone FROM numbers WHERE user_id=? AND status='pending' ORDER BY created_at ASC", (user_id,))
     return cursor.fetchall()
 
 def get_current_number(user_id):
-    if user_id not in user_state:
-        user_state[user_id] = {'index': 0}
-    
+    if user_id not in user_state: user_state[user_id] = {'index': 0}
     numbers = get_user_numbers(user_id)
-    if not numbers:
-        return None, None, 0
-    
+    if not numbers: return None, None, 0
     index = user_state[user_id]['index']
-    if index >= len(numbers):
+    if index >= len(numbers): 
         user_state[user_id]['index'] = 0
         index = 0
-    
     return numbers[index], index, len(numbers)
 
 def send_current_number(chat_id, user_id):
     delete_last_message(chat_id)
-    
     number_data, index, total = get_current_number(user_id)
     if not number_data:
-        sent = bot.send_message(chat_id, "📭 **Numbers finished!**\n\nTap ➕ to load more", 
-                               reply_markup=main_menu_keyboard(), parse_mode='Markdown')
+        sent = bot.send_message(chat_id, "📭 **Numbers finished!**\n\nTap ➕ to load more", reply_markup=main_menu_keyboard(), parse_mode='Markdown')
     else:
         num_id, phone = number_data
-        
         kb = InlineKeyboardMarkup()
         kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
-        kb.row(InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
-               InlineKeyboardButton("⬅️ BACK", callback_data="back"))
+        kb.row(InlineKeyboardButton("⏭️ SKIP", callback_data="skip"), InlineKeyboardButton("⬅️ BACK", callback_data="back"))
         kb.row(InlineKeyboardButton(f"📊 {index+1}/{total}", callback_data="stats"))
-        
         phone_display = phone.replace('+', '＋')
         text = f"**📱 {phone_display}**\n\n**Progress:** `{index+1}/{total}`"
-        
         sent = bot.send_message(chat_id, text, reply_markup=kb, parse_mode='Markdown')
-    
     last_messages[chat_id] = sent.message_id
 
-# ===== Callbacks =====
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
@@ -169,8 +140,7 @@ def callback_handler(call):
         kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
         kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
         kb.row(InlineKeyboardButton("↩️ Back", callback_data="back_main"))
-        bot.edit_message_text("📥 **Load Numbers:**", chat_id, call.message.message_id, 
-                             reply_markup=kb, parse_mode='Markdown')
+        bot.edit_message_text("📥 **Load Numbers:**", chat_id, call.message.message_id, reply_markup=kb, parse_mode='Markdown')
     
     elif data == "load_excel":
         bot.answer_callback_query(call.id, "📎 Send Excel file (.xlsx)")
@@ -187,8 +157,7 @@ def callback_handler(call):
         send_current_number(chat_id, user_id)
     
     elif data == "back_main":
-        bot.edit_message_text(WELCOME_TEXT, chat_id, call.message.message_id, 
-                             reply_markup=main_menu_keyboard(), parse_mode='Markdown')
+        bot.edit_message_text(WELCOME_TEXT, chat_id, call.message.message_id, reply_markup=main_menu_keyboard(), parse_mode='Markdown')
     
     elif data == "stats":
         cursor.execute("SELECT COUNT(*) FROM numbers WHERE user_id=? AND status='pending'", (user_id,))
@@ -215,7 +184,6 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "⬅️ Back")
         send_current_number(chat_id, user_id)
 
-# ===== Обработка файлов =====
 @bot.message_handler(content_types=['document'])
 def handle_excel(message):
     user_id = message.from_user.id
@@ -223,19 +191,14 @@ def handle_excel(message):
         try:
             file_info = bot.get_file(message.document.file_id)
             downloaded_file = bot.download_file(file_info.file_path)
-            
             with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
                 tmp.write(downloaded_file)
                 tmp_path = tmp.name
-            
             count = import_numbers(user_id, tmp_path, "excel")
             os.unlink(tmp_path)
-            
             kb = InlineKeyboardMarkup()
             kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
-            
-            bot.reply_to(message, f"✅ **Loaded {count} unique numbers!**\nStart calling 👇", 
-                        reply_markup=kb, parse_mode='Markdown')
+            bot.reply_to(message, f"✅ **Loaded {count} unique numbers!**\nStart calling 👇", reply_markup=kb, parse_mode='Markdown')
             del user_state[user_id]['waiting_excel']
         except Exception as e:
             bot.reply_to(message, f"❌ Excel error: {str(e)}")
@@ -247,38 +210,27 @@ def handle_text(message):
         count = import_numbers(user_id, message.text, "text")
         kb = InlineKeyboardMarkup()
         kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
-        
-        bot.reply_to(message, f"✅ **Loaded {count} unique numbers!**\nStart calling 👇", 
-                    reply_markup=kb, parse_mode='Markdown')
+        bot.reply_to(message, f"✅ **Loaded {count} unique numbers!**\nStart calling 👇", reply_markup=kb, parse_mode='Markdown')
         del user_state[user_id]['waiting_text']
     else:
         send_current_number(message.chat.id, user_id)
 
-# ===== НЕУБИВАЕМЫЙ Polling v4 =====
 def safe_polling():
     max_retries = 5
     retry_delay = 30
-    
     while True:
         try:
             logger.info("🚀 SpeedCallerBot v4 — Polling START")
             requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset=-1", timeout=5)
             time.sleep(2)
-            
-            bot.polling(
-                non_stop=True,
-                interval=0.5,
-                timeout=25,
-                long_polling_timeout=25
-            )
+            bot.polling(non_stop=True, interval=0.5, timeout=25, long_polling_timeout=25)
         except Exception as e:
             logger.error(f"🚨 Polling crashed: {str(e)[:100]}")
             if "409" in str(e):
                 logger.warning("🔄 409 Conflict — HARD RESET")
                 try:
                     requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset=-1")
-                except:
-                    pass
+                except: pass
                 time.sleep(120)
             else:
                 time.sleep(retry_delay)
