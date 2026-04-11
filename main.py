@@ -160,72 +160,6 @@ def send_current_number(chat_id, user_id):
 def callback_handler(call):
     user_id = call.from_user.id
     chat_id = call.message.chat.id
-    
-    if call.data == "load_menu":
-        kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-        kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
-        kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
-        kb.row(InlineKeyboardButton("↩️ Back", callback_data="back_main"))
-        
-        bot.edit_message_text("📥 **Load Numbers:**", chat_id, call.message.message_id, 
-                             reply_markup=kb, parse_mode='Markdown')
-    
-    elif call.data == "load
-
-        elif call.data == "load_excel":
-        bot.answer_callback_query(call.id, "📎 Send Excel file (.xlsx)")
-        user_state[user_id] = {'waiting_excel': True}
-        
-    elif call.data == "load_text":
-        bot.answer_callback_query(call.id, "📝 Send numbers as text")
-        user_state[user_id] = {'waiting_text': True}
-        
-    elif call.data == "clear_all":
-        cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
-        conn.commit()
-        bot.answer_callback_query(call.id, "🗑️ Cleared!")
-        send_current_number(chat_id, user_id)
-        
-    elif call.data == "back_main":
-        bot.edit_message_text(WELCOME_TEXT, chat_id, call.message.message_id, 
-                             reply_markup=main_menu_keyboard(), parse_mode='Markdown')
-    
-    elif call.data == "stats":
-        cursor.execute("SELECT COUNT(*) FROM numbers WHERE user_id=? AND status='pending'", (user_id,))
-        pending = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM numbers WHERE user_id=?", (user_id,))
-        total = cursor.fetchone()[0]
-        bot.answer_callback_query(call.id, f"📊 Pending: {pending}/{total}")
-    
-    elif call.data.startswith("call_"):
-        num_id = int(call.data.split("_")[1])
-        cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (num_id,))
-        conn.commit()
-        bot.answer_callback_query(call.id, f"📞 CALLING {get_current_number(user_id)[0][1]}")
-        user_state[user_id]['index'] += 1
-        send_current_number(chat_id, user_id)
-        
-    elif
-
-    @bot.message_handler(func=lambda m: True)
-def handle_text(message):
-    user_id = message.from_user.id
-    if user_id in user_state and user_state[user_id].get('waiting_text'):
-        count = import_numbers(user_id, message.text, "text")
-        bot.reply_to(message, f"✅ **Loaded {count} unique numbers!**\nStart calling 👇", 
-                    reply_markup=InlineKeyboardMarkup().add(
-                        InlineKeyboardButton("🚀 START", callback_data="start_calling")
-                    ), parse_mode='Markdown')
-        del user_state[user_id]['waiting_text']
-    else:
-        send_current_number(message.chat.id, user_id)
-
-@bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
-    user_id = call.from_user.id
-    chat_id = call.message.chat.id
-    
     data = call.data
     
     if data == "load_menu":
@@ -266,7 +200,7 @@ def callback_handler(call):
         num_id = int(data.split("_")[1])
         cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (num_id,))
         conn.commit()
-        bot.answer_callback_query(call.id, f"📞 CALLING")
+        bot.answer_callback_query(call.id, "📞 CALLING")
         user_state[user_id]['index'] += 1
         send_current_number(chat_id, user_id)
     
