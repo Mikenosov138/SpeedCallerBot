@@ -495,40 +495,25 @@ def universal_import(message):
 
 print("✅ PART 6: Multi-Add + Reset + Polish ready")
 
-# ===== ЧАСТЬ 7: PRODUCTION READY + WEBHOOK BACKUP =====
+# ===== FIXED PART 7: Production Polling =====
 
-# Error handler
-@bot.message_handler(func=lambda message: True)
-def error_catcher(message):
-    """Ловит все необработанные сообщения"""
-    logger.warning(f"Unhandled message from {message.from_user.id}: {message.text}")
-    if message.text not in ['/start', '/reset', '/clear']:
-        bot.reply_to(message, "❓ Use /start or send numbers")
-
-# Graceful shutdown
-import signal
-def signal_handler(sig, frame):
-    logger.info("Shutting down gracefully...")
-    conn.close()
-    os._exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-
-# ФИНАЛЬНЫЙ LAUNCH
 if __name__ == "__main__":
-    logger.info("🎉 SpeedCallerBot v3 FULL PRODUCTION READY!")
-    logger.info("📱 Features: Excel/Text, tg://call, Multi-add, Stats, Reset")
+    logger.info("🎉 SpeedCallerBot v3 PRODUCTION START!")
     
-    try:
-        # Production polling с retry
-        while True:
+    while True:
+        try:
+            logger.info("Starting polling...")
             bot.infinity_polling(
                 timeout=20,
-                long_polling_timeout=15,
-                retry_after=5
+                long_polling_timeout=15
             )
-    except Exception as e:
-        logger.error(f"Fatal polling error: {e}")
-        time.sleep(30)
-        logger.info("Restarting polling...")
+        except KeyboardInterrupt:
+            logger.info("Shutdown requested")
+            break
+        except Exception as e:
+            logger.error(f"Polling crashed: {e}")
+            logger.info("Restarting in 30 seconds...")
+            time.sleep(30)
+    
+    logger.info("Bot stopped")
+    conn.close()
