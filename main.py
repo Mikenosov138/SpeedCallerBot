@@ -1,519 +1,377 @@
-# ===== СкоростьЗвонокBot v3 - ПРОФЕССИОНАЛЬНАЯ ВЕРСИЯ =====
-# ЧАСТЬ 1: БАЗА + ЛОГИ + КОНСТАНТЫ
-
 import os
-import sqlite3
-import telebot
-import logging
-import time
 import re
+import time
+import sqlite3
+import logging
+import tempfile
+import telebot
 import openpyxl
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Логирование
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    handlers=[
-        logging.FileHandler('speedcaller.log'),
-        logging.StreamHandler()
-    ]
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
-logger.info("🚀 SpeedCallerBot v3 initialized")
 
-# Продвинутая БД
 conn = sqlite3.connect("speedcaller.db", check_same_thread=False)
 cursor = conn.cursor()
+
 cursor.execute("""
-CREATE TABLE IF NOT EXISTS calls (
+CREATE TABLE IF NOT EXISTS numbers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    number TEXT,
+    user_id INTEGER NOT NULL,
+    phone TEXT NOT NULL,
     status TEXT DEFAULT 'pending',
-    position INTEGER DEFAULT 0,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    source TEXT DEFAULT 'manual'
+    source TEXT DEFAULT 'manual',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 """)
+cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_user_phone ON numbers(user_id, phone)")
 conn.commit()
-logger.info("✅ Professional database ready")
 
-# Состояния
-user_sessions = {}
-active_messages = {}
+user_state = {}
+user_messages = {}
 
-WELCOME_TEXT = """
-👋 **SpeedCallerBot v3 - Professional Edition**
+WELCOME_TEXT = (
+    "Hello! I am a bot for quickly calling a client database.\n\n"
+    "I help you increase the number of calls made per day by making it easy to load a list of numbers and work through them one by one.\n\n"
+    "How to use:\n"
+    "1. Tap SKIP to continue.\n"
+    "2. Upload an Excel file or send numbers in a text message.\n"
+    "3. Use CALL / SKIP / BACK while working through the list.\n\n"
+    "There is no limit to the number of phone numbers you can load."
+)
 
-📞 Designed for **FAST client base calling**
-📊 **Unlimited numbers supported**
+def delete_last_bot_message(chat_id):
+    msg_id = user_messages.get(chat_id)
+    if msg_id:
+        try:
+            bot.delete_message(chat_id, msg_id)
+        except:
+            pass
 
-**How to start:**
-• Send **Excel file** (.xlsx) OR
-• Send **text message** with phone numbers
+def save_bot_message(chat_id, message_id):
+    user_messages[chat_id] = message_id
 
-**Example text:** `+1234567890 987-654-3210`
+def main_menu():
+    kb = InlineKeyboardMarkup()
+    kb.row(InlineKeyboardButton("SKIP", callback_data="welcome_skip"))
+    return kb
 
-Ready? Send numbers now! 🚀
-"""
+@bot.message_handler(commands=["start"])
+def cmd_start(message):
+    delete_last_bot_message(message.chat.id)
+    sent = bot.send_message(message.chat.id, WELCOME_TEXT, reply_markup=main_menu())
+    save_bot_message(message.chat.id, sent.message_id)
 
-print("✅ PART 1: Database + Welcome ready")
+print("PART 1 READY")
 
-# ===== ЧАСТЬ 2: УНИВЕРСАЛЬНЫЙ ПАРСЕР =====
+# ===== ЧАСТЬ 2: Загрузка номеров =====
 
-def parse_phone_number(raw_text):
-    """Универсальный парсер номеров"""
-    # Убираем все НЕ цифры
-    clean = re.sub(r'[^\d+]', '', raw_text)
-    
-    # Минимум 8 цифр
+def clean_phone(phone):
+    """Очистка номера"""
+    clean = re.sub(r'[^\d+]', '', phone)
     if len(clean) < 8:
         return None
-    
-    # Берём последние 10 цифр для US формат
-    if len(clean) > 10:
-        clean = clean[-10:]
-    
-    # Форматируем +1-XXX-XXX-XXXX
-    formatted = f"+1-{clean[0:3]}-{clean[3:6]}-{clean[6:10]}"
-    return formatted
+    if clean.startswith('8'):
+        clean = '+7' + clean[1:]
+    if not clean.startswith('+'):
+        clean = '+1' + clean
+    return clean[-12:]  # Последние 12 символов
 
-def import_numbers(user_id, source_data, source_type="text"):
-    """Импорт номеров (добавляет к существующим!)"""
-    added = 0
+def import_numbers(user_id, data, source_type):
+    """Импорт номеров с удалением дублей"""
+    count = 0
     
-    # Парсим данные
+    cursor.execute("BEGIN TRANSACTION")
+    
     if source_type == "excel":
-        numbers = parse_excel(source_data)
-    else:
-        numbers = [line.strip() for line in source_data.split('\n') if line.strip()]
-    
-    # Добавляем к базе (НЕ удаляем старые!)
-    for raw_number in numbers:
-        formatted = parse_phone_number(raw_number)
-        if formatted:
-            cursor.execute("""
-                INSERT OR IGNORE INTO calls (user_id, number, status, source) 
-                VALUES (?, ?, 'pending', ?)
-            """, (user_id, formatted, source_type))
-            added += cursor.rowcount
-    
-    conn.commit()
-    logger.info(f"Imported {added} numbers from {source_type} for user {user_id}")
-    return added
-
-def parse_excel(file_bytes):
-    """Парсер Excel - все листы/ячейки"""
-    try:
-        import tempfile
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
-        temp_file.write(file_bytes)
-        temp_file.close()
-        
-        wb = openpyxl.load_workbook(temp_file.name, data_only=True)
         numbers = []
-        
-        for sheet in wb.worksheets:
-            for row in sheet.iter_rows(values_only=True):
-                for cell in row:
-                    if cell:
-                        numbers.append(str(cell))
-        
-        os.unlink(temp_file.name)
-        return numbers
-    except:
-        return []
+        try:
+            wb = openpyxl.load_workbook(data)
+            for ws in wb.worksheets:
+                for row in ws.iter_rows(values_only=True):
+                    for cell in row:
+                        if cell:
+                            numbers.append(str(cell))
+        except:
+            numbers = []
+    else:  # text
+        numbers = [line.strip() for line in data.splitlines() if line.strip()]
+    
+    for raw in numbers:
+        phone = clean_phone(raw)
+        if phone:
+            cursor.execute("""
+                INSERT OR IGNORE INTO numbers (user_id, phone, source, status) 
+                VALUES (?, ?, ?, 'pending')
+            """, (user_id, phone, source_type))
+            if cursor.rowcount > 0:
+                count += 1
+    
+    cursor.execute("COMMIT")
+    conn.commit()
+    return count
 
-@bot.message_handler(content_types=["text", "document"])
-def handle_numbers(message):
-    user_id = message.from_user.id
-    chat_id = message.chat.id
+@bot.message_handler(content_types=["document"])
+def handle_excel(message):
+    if "spreadsheet" not in message.document.mime_type:
+        bot.reply_to(message, "❌ Only Excel (.xlsx)")
+        return
     
     try:
-        if message.text:
-            # ТЕКСТ
-            bot.reply_to(message, "📱 Parsing TEXT numbers...")
-            count = import_numbers(user_id, message.text, "text")
-        elif message.document and "spreadsheet" in message.document.mime_type:
-            # EXCEL
-            bot.reply_to(message, "📊 Parsing Excel...")
-            file_info = bot.get_file(message.document.file_id)
-            file_bytes = bot.download_file(file_info.file_path)
-            count = import_numbers(user_id, file_bytes, "excel")
-        else:
-            bot.reply_to(message, "❌ Send TEXT with numbers or .XLSX file")
-            return
+        bot.reply_to(message, "📥 Processing Excel...")
+        file_info = bot.get_file(message.document.file_id)
+        file_bytes = bot.download_file(file_info.file_path)
+        count = import_numbers(message.from_user.id, file_bytes, "excel")
         
-        # Результат
-        total = cursor.execute("SELECT COUNT(*) FROM calls WHERE user_id=?", (user_id,)).fetchone()[0]
         markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton("☎️ CALL", callback_data="start_calling"))
+        markup.row(InlineKeyboardButton("📞 START CALLING", callback_data="start_calling"))
         markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
         
         bot.send_message(
-            chat_id,
-            f"✅ **{count} NEW numbers imported!**\n"
-            f"📈 **Total in DB: {total}**\n\n"
-            f"👇 Ready to CALL",
+            message.chat.id,
+            f"✅ **{count} unique numbers** imported from Excel\n"
+            f"👆 Ready to start calling",
             reply_markup=markup,
-            parse_mode='Markdown'
+            parse_mode="Markdown"
         )
-        
     except Exception as e:
-        logger.error(f"Import error: {e}")
-        bot.reply_to(message, "❌ Import failed. Try simple text format")
+        bot.reply_to(message, "❌ Excel processing failed")
 
-print("✅ PART 2: Universal Parser (Text + Excel) ready")
-
-# ===== ЧАСТЬ 3: CALL с tg://call (полноэкранная) =====
-
-def get_next_pending_call(user_id):
-    """Получает следующий pending номер"""
-    result = cursor.execute("""
-        SELECT id, number, position 
-        FROM calls 
-        WHERE user_id=? AND status='pending' 
-        ORDER BY position ASC, id ASC 
-        LIMIT 1
-    """, (user_id,)).fetchone()
-    return result
-
-def update_call_status(call_id, new_status):
-    """Обновляет статус звонка"""
-    cursor.execute("UPDATE calls SET status=? WHERE id=?", (new_status, call_id))
-    conn.commit()
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('call_'))
-def handle_call_action(call):
-    user_id = call.from_user.id
-    chat_id = call.message.chat.id
-    message_id = call.message.message_id
-    
-    action = call.data.split('_')[1]  # call_start, call_skip, call_back
-    
-    if action == "start":
-        # ПОЛУЧАЕМ НОМЕР
-        call_data = get_next_pending_call(user_id)
-        if not call_data:
-            markup = InlineKeyboardMarkup()
-            markup.row(InlineKeyboardButton("📊 ADD NUMBERS", callback_data="add_numbers"))
-            bot.edit_message_text(
-                "📭 **No pending calls**\n\nSend TEXT or Excel to add numbers",
-                chat_id, message_id, 
-                reply_markup=markup,
-                parse_mode='Markdown'
-            )
-            return
-        
-        call_id, number, position = call_data
-        
-        # ПОЛНОЭКРАННАЯ CALL КНОПКА
-        markup = InlineKeyboardMarkup()
-        markup.row(
-            InlineKeyboardButton(
-                f"☎️ CALL {number}", 
-                url=f"tg://call?phone={number.replace('+1-', '').replace('-', '')}",
-                callback_data=f"call_marked_{call_id}"
-            )
-        )
-        markup.row(
-            InlineKeyboardButton("⏭️ SKIP", callback_data="call_skip"),
-            InlineKeyboardButton("⬅️ PREV", callback_data="call_back")
-        )
-        markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
-        
-        text = (
-            f"📞 **CALL #{position + 1}**\n\n"
-            f"📱 <code>{number}</code>\n\n"
-            f"👆 Tap CALL → Phone app opens"
-        )
-        
-        bot.edit_message_text(
-            text,
-            chat_id, message_id,
-            reply_markup=markup,
-            parse_mode='HTML'
-        )
-        active_messages[user_id] = message_id
-        
-    elif action == "skip":
-        call_data = get_next_pending_call(user_id)
-        if call_data:
-            update_call_status(call_data[0], 'skipped')
-        bot.answer_callback_query(call.id, "⏭️ SKIPPED ✓")
-    
-    elif action == "back":
-        # Возврат к предыдущему (простой previous)
-        bot.answer_callback_query(call.id, "⬅️ Back to list")
-    
-    elif action == "marked":
-        # CALL был сделан
-        call_id = call.data.split('_')[2]
-        update_call_status(call_id, 'called')
-        bot.answer_callback_query(call.id, "✅ CALL COMPLETED!")
-
-print("✅ PART 3: tg://call button (fullscreen) ready")
-
-# ===== ЧАСТЬ 4: STATS + MULTI-ADD =====
-
-def get_user_stats(user_id):
-    """Детальная статистика"""
-    total = cursor.execute("SELECT COUNT(*) FROM calls WHERE user_id=?", (user_id,)).fetchone()[0]
-    pending = cursor.execute("SELECT COUNT(*) FROM calls WHERE user_id=? AND status='pending'", (user_id,)).fetchone()[0]
-    called = cursor.execute("SELECT COUNT(*) FROM calls WHERE user_id=? AND status='called'", (user_id,)).fetchone()[0]
-    skipped = cursor.execute("SELECT COUNT(*) FROM calls WHERE user_id=? AND status='skipped'", (user_id,)).fetchone()[0]
-    
-    return {
-        'total': total,
-        'pending': pending,
-        'called': called,
-        'skipped': skipped,
-        'conversion': round((called / total * 100), 1) if total > 0 else 0
-    }
-
-@bot.callback_query_handler(func=lambda call: call.data in ['show_stats', 'add_numbers', 'reset_stats'])
-def stats_handler(call):
-    user_id = call.from_user.id
-    chat_id = call.message.chat.id
-    message_id = call.message.message_id
-    
-    action = call.data
-    
-    if action == "show_stats":
-        stats = get_user_stats(user_id)
-        text = (
-            f"📊 **CALLING STATS**\n\n"
-            f"📈 **Total**: {stats['total']}\n"
-            f"⏳ **Pending**: {stats['pending']}\n"
-            f"✅ **Called**: {stats['called']}\n"
-            f"⏭️ **Skipped**: {stats['skipped']}\n\n"
-            f"🎯 **Conversion**: {stats['conversion']}%"
-        )
-        
-        markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton("➕ ADD MORE", callback_data="add_numbers"))
-        markup.row(InlineKeyboardButton("🗑️ RESET", callback_data="reset_stats"))
-        markup.row(InlineKeyboardButton("☎️ CONTINUE CALL", callback_data="start_calling"))
-        
-        bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
-    
-    elif action == "add_numbers":
-        text = (
-            "➕ **ADD MORE NUMBERS**\n\n"
-            "**Send:**\n"
-            "• TEXT: `+1234567890 9876543210`\n"
-            "• Excel file (.xlsx)\n\n"
-            "**Numbers will be ADDED to existing base**"
-        )
-        markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton("📊 BACK TO STATS", callback_data="show_stats"))
-        
-        bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
-    
-    elif action == "reset_stats":
-        cursor.execute("DELETE FROM calls WHERE user_id=?", (user_id,))
-        conn.commit()
-        user_sessions[user_id] = {'position': 0}
-        text = "🗑️ **DATABASE RESET**\n\nAll numbers cleared.\nAdd new numbers to start."
-        markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton("📊 NEW STATS", callback_data="show_stats"))
-        bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
-
-print("✅ PART 4: Detailed Stats + Multi-Add ready")
-
-# ===== ЧАСТЬ 5: ПРОФ ДИЗАЙН КНОПОК =====
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith('call_'))
-def handle_call_action(call):
-    user_id = call.from_user.id
-    chat_id = call.message.chat.id
-    message_id = call.message.message_id
-    
-    action = call.data.split('_')[1]
-    
-    if action == "start":
-        call_data = get_next_pending_call(user_id)
-        if not call_data:
-            markup = InlineKeyboardMarkup()
-            markup.row(InlineKeyboardButton("➕ ADD NUMBERS", callback_data="add_numbers"))
-            bot.edit_message_text(
-                "📭 **No pending calls**\n\n👆 Send TEXT/Excel to continue",
-                chat_id, message_id, 
-                reply_markup=markup,
-                parse_mode='Markdown'
-            )
-            return
-        
-        call_id, number, position = call_data
-        
-        # ОЧЕНЬ БОЛЬШАЯ CALL КНОПКА (50% ширина)
-        markup = InlineKeyboardMarkup()
-        
-        # CALL - ПОЛЭКРАНА
-        call_btn = InlineKeyboardButton(
-            f"📞 CALL {number}",
-            url=f"tg://call?phone={number.replace('+1-', '').replace('-', '')}",
-            callback_data=f"call_marked_{call_id}"
-        )
-        skip_btn = InlineKeyboardButton("⏭️ SKIP", callback_data="call_skip")
-        
-        markup.row(call_btn, skip_btn)  # 50% + 50%
-        
-        # Нижний ряд
-        markup.row(
-            InlineKeyboardButton("⬅️ PREV", callback_data="call_back"),
-            InlineKeyboardButton("📊 STATS", callback_data="show_stats")
-        )
-        
-        # КРУТОЙ ДИЗАЙН ТЕКСТА
-        total_pending = cursor.execute("SELECT COUNT(*) FROM calls WHERE user_id=? AND status='pending'", (user_id,)).fetchone()[0]
-        text = (
-            f"🎯 **CALL #{position + 1}/{total_pending}**\n\n"
-            f"📱 <b>{number}</b>\n\n"
-            f"👆 <i>Tap CALL → Phone opens automatically</i>"
-        )
-        
-        bot.edit_message_text(
-            text,
-            chat_id, message_id,
-            reply_markup=markup,
-            parse_mode='HTML'
-        )
-        active_messages[user_id] = message_id
-        
-        user_sessions[user_id] = {
-            'current_call_id': call_id,
-            'current_position': position,
-            'message_id': message_id
-        }
-    
-    elif action == "skip":
-        current = user_sessions.get(user_id, {}).get('current_call_id')
-        if current:
-            update_call_status(current, 'skipped')
-        
-        bot.answer_callback_query(call.id, "⏭️ SKIPPED → Next ready!")
-    
-    elif action == "back":
-        bot.answer_callback_query(call.id, "⬅️ Previous call ready")
-    
-    elif action == "marked":
-        # CALL завершён
-        call_id = call.data.split('_')[2]
-        update_call_status(call_id, 'called')
-        bot.answer_callback_query(call.id, "✅ CALL DONE ✓")
-
-print("✅ PART 5: Pro button design (CALL 50%) ready")
-
-# ===== ЧАСТЬ 6: MULTI-ADD + POLISH + RESET =====
-
-@bot.callback_query_handler(func=lambda call: call.data == "add_numbers")
-def multi_add_handler(call):
-    """Multi-add - добавление к существующей базе"""
-    user_id = call.from_user.id
-    chat_id = call.message.chat.id
-    message_id = call.message.message_id
-    
-    stats = get_user_stats(user_id)
-    text = (
-        f"➕ **ADD TO EXISTING BASE**\n\n"
-        f"📊 Current: **{stats['total']}** numbers\n\n"
-        "**Send:**\n"
-        "• `+1234567890 9876543210` (TEXT)\n"
-        "• .XLSX file\n\n"
-        "**New numbers will be ADDED** (not replaced!)"
-    )
-    
-    markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
-    markup.row(InlineKeyboardButton("☎️ CONTINUE CALL", callback_data="start_calling"))
-    
-    bot.edit_message_text(text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
-
-@bot.message_handler(commands=["reset", "clear"])
-def reset_handler(message):
-    """Полная очистка базы"""
-    user_id = message.from_user.id
-    cursor.execute("DELETE FROM calls WHERE user_id=?", (user_id,))
-    conn.commit()
-    user_sessions[user_id] = {'position': 0}
-    
-    markup = InlineKeyboardMarkup()
-    markup.row(InlineKeyboardButton("📊 ADD NUMBERS", callback_data="add_numbers"))
-    
-    bot.reply_to(
-        message,
-        "🗑️ **DATABASE CLEARED!**\n\n"
-        "👆 Send TEXT or Excel to start fresh",
-        reply_markup=markup,
-        parse_mode='Markdown'
-    )
-
-# Улучшенный handle_input для multi-add
-@bot.message_handler(content_types=["text", "document"], func=lambda m: True)
-def universal_import(message):
-    """Универсальный импорт для всех случаев"""
-    user_id = message.from_user.id
+@bot.message_handler(func=lambda m: True)
+def handle_text(message):
+    if message.text.startswith('/'):
+        return
     
     try:
-        if message.text:
-            count = import_numbers(user_id, message.text, "text")
-            source_text = "TEXT"
-        elif message.document and "spreadsheet" in message.document.mime_type:
-            file_info = bot.get_file(message.document.file_id)
-            file_bytes = bot.download_file(file_info.file_path)
-            count = import_numbers(user_id, file_bytes, "excel")
-            source_text = "EXCEL"
-        else:
-            return
-        
-        total = cursor.execute("SELECT COUNT(*) FROM calls WHERE user_id=?", (user_id,)).fetchone()[0]
+        bot.reply_to(message, "📱 Processing text...")
+        count = import_numbers(message.from_user.id, message.text, "text")
         
         markup = InlineKeyboardMarkup()
-        markup.row(InlineKeyboardButton("☎️ CALL NOW", callback_data="start_calling"))
+        markup.row(InlineKeyboardButton("📞 START CALLING", callback_data="start_calling"))
         markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
         
-        bot.reply_to(
-            message,
-            f"✅ **{count} NEW** from {source_text}!\n"
-            f"📊 **TOTAL: {total}**\n\n"
-            f"Ready to CALL 👇",
+        bot.send_message(
+            message.chat.id,
+            f"✅ **{count} unique numbers** imported from text\n"
+            f"👆 Ready to start calling",
             reply_markup=markup,
-            parse_mode='Markdown'
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        bot.reply_to(message, "❌ Text processing failed")
+
+print("PART 2 READY")
+
+# ===== ЧАСТЬ 3: CALL экран =====
+
+def get_next_number(user_id):
+    """Следующий pending номер"""
+    result = cursor.execute("""
+        SELECT id, phone, (SELECT COUNT(*) FROM numbers WHERE user_id=? AND status='pending') as total_pending
+        FROM numbers 
+        WHERE user_id=? AND status='pending' 
+        ORDER BY id ASC 
+        LIMIT 1
+    """, (user_id, user_id)).fetchone()
+    return result
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    msg_id = call.message.message_id
+    
+    delete_last_bot_message(chat_id)
+    
+    if call.data == "start_calling":
+        number_data = get_next_number(user_id)
+        if not number_data:
+            markup = InlineKeyboardMarkup()
+            markup.row(InlineKeyboardButton("➕ LOAD NUMBERS", callback_data="load_numbers"))
+            bot.edit_message_text(
+                "📭 No numbers to call\n\nLoad Excel or send text numbers",
+                chat_id, msg_id,
+                reply_markup=markup
+            )
+            return
+        
+        call_id, phone, total_pending = number_data
+        
+        # КЛИКАБЕЛЬНЫЙ НОМЕР
+        phone_link = f"[📞 {phone}](tel:{phone.replace('+', '').replace('-', '')})"
+        
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("⏭️ SKIP", callback_data="skip_next"))
+        markup.row(InlineKeyboardButton("⬅️ BACK", callback_data="back_menu"))
+        markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
+        
+        text = (
+            f"📞 **#{total_pending} numbers left**\n\n"
+            f"{phone_link}\n\n"
+            f"*Tap number → CALL opens*\n"
+            f"SKIP → next number"
         )
         
-    except Exception as e:
-        logger.error(f"Universal import error: {e}")
-        bot.reply_to(message, "❌ Try again or use /reset")
+        sent = bot.edit_message_text(
+            text,
+            chat_id, msg_id,
+            reply_markup=markup,
+            parse_mode="Markdown"
+        )
+        save_bot_message(chat_id, sent.message_id)
+        
+    elif call.data == "skip_next":
+        # Помечаем текущий как skipped
+        cursor.execute("UPDATE numbers SET status='skipped' WHERE user_id=? AND status='pending' ORDER BY id ASC LIMIT 1", (user_id,))
+        conn.commit()
+        bot.answer_callback_query(call.id, "⏭️ Skipped → Next!")
+        
+    elif call.data == "back_menu":
+        # Назад в главное меню
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
+        markup.row(InlineKeyboardButton("➕ LOAD MORE", callback_data="load_numbers"))
+        bot.edit_message_text(
+            "📋 **Main menu**\n\nWhat next?",
+            chat_id, msg_id,
+            reply_markup=markup
+        )
+    
+    elif call.data == "show_stats":
+        stats = cursor.execute("""
+            SELECT status, COUNT(*) FROM numbers 
+            WHERE user_id=? 
+            GROUP BY status
+        """, (user_id,)).fetchall()
+        
+        text = "📊 **Stats**\n\n"
+        total = 0
+        for status, cnt in stats:
+            text += f"• {status.upper()}: {cnt}\n"
+            total += cnt
+        
+        text += f"\n**Total: {total}**"
+        
+        markup = InlineKeyboardMarkup()
+        markup.row(InlineKeyboardButton("📞 CALL", callback_data="start_calling"))
+        markup.row(InlineKeyboardButton("➕ LOAD", callback_data="load_numbers"))
+        
+        bot.edit_message_text(text, chat_id, msg_id, reply_markup=markup)
 
-# Добавляем в stats_handler (строка 12 ЧАСТИ 4):
-# InlineKeyboardButton("➕ ADD MORE", callback_data="add_numbers")
+print("PART 3 READY")
 
-print("✅ PART 6: Multi-Add + Reset + Polish ready")
+# ===== ЧАСТЬ 4: Дубли + Load More =====
 
-# ===== FIXED PART 7: Production Polling =====
+@bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
+def remove_duplicates(call):
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    msg_id = call.message.message_id
+    
+    before = cursor.execute("SELECT COUNT(*) FROM numbers WHERE user_id=?", (user_id,)).fetchone()[0]
+    
+    # Удаляем дубли (оставляем первый)
+    cursor.execute("""
+        DELETE FROM numbers 
+        WHERE id NOT IN (
+            SELECT MIN(id) 
+            FROM numbers 
+            WHERE user_id=? AND phone IS NOT NULL 
+            GROUP BY phone
+        )
+        AND user_id=?
+    """, (user_id, user_id))
+    
+    after = cursor.execute("SELECT COUNT(*) FROM numbers WHERE user_id=?", (user_id,)).fetchone()[0]
+    removed = before - after
+    
+    text = f"🧹 **Duplicates removed**\n\nBefore: {before}\nAfter: {after}\n**Removed: {removed}**"
+    
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton("📞 CALL", callback_data="start_calling"))
+    markup.row(InlineKeyboardButton("📊 STATS", callback_data="show_stats"))
+    
+    bot.edit_message_text(text, chat_id, msg_id, reply_markup=markup)
+    bot.answer_callback_query(call.id, f"Removed {removed} duplicates")
 
+@bot.callback_query_handler(func=lambda call: call.data == "load_numbers")
+def load_numbers_handler(call):
+    user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    msg_id = call.message.message_id
+    
+    text = (
+        "➕ **Load phone numbers**\n\n"
+        "**Send:**\n"
+        "• Excel file (.xlsx)\n"
+        "• Text: `+1234567890 987-654-3210`\n\n"
+        "**Duplicates auto-removed**"
+    )
+    
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton("🧹 REMOVE DUPES", callback_data="remove_duplicates"))
+    markup.row(InlineKeyboardButton("📊 BACK TO STATS", callback_data="show_stats"))
+    
+    bot.edit_message_text(text, chat_id, msg_id, reply_markup=markup, parse_mode="Markdown")
+
+# Улучшенная статистика
+def get_detailed_stats(user_id):
+    stats = cursor.execute("""
+        SELECT status, COUNT(*), source 
+        FROM numbers 
+        WHERE user_id=? 
+        GROUP BY status, source
+    """, (user_id,)).fetchall()
+    
+    total = cursor.execute("SELECT COUNT(*) FROM numbers WHERE user_id=?", (user_id,)).fetchone()[0]
+    
+    text = f"📊 **Detailed Stats** (Total: {total})\n\n"
+    for status, count, source in stats:
+        text += f"• {status.upper()} ({source}): {count}\n"
+    
+    return text
+
+print("PART 4 READY")
+
+# ===== ЧАСТЬ 5: Production Ready =====
+
+@bot.callback_query_handler(func=lambda call: call.data == "welcome_skip")
+def welcome_skip(call):
+    """Переход от приветствия к загрузке"""
+    chat_id = call.message.chat.id
+    msg_id = call.message.message_id
+    
+    markup = InlineKeyboardMarkup()
+    markup.row(InlineKeyboardButton("📊 Load Numbers", callback_data="load_numbers"))
+    markup.row(InlineKeyboardButton("🧹 Remove Duplicates", callback_data="remove_duplicates"))
+    
+    bot.edit_message_text(
+        "👆 **Ready to load numbers**\n\nSend Excel or text message:",
+        chat_id, msg_id,
+        reply_markup=markup
+    )
+
+# Общий обработчик ошибок
+@bot.message_handler(func=lambda m: True)
+def fallback_handler(message):
+    if not message.text or message.text.startswith('/'):
+        return
+    handle_text(message)  # Все тексты = импорт
+
+# Graceful polling
 if __name__ == "__main__":
-    logger.info("🎉 SpeedCallerBot v3 PRODUCTION START!")
+    logger.info("🚀 SpeedCallerBot v3.0 - PRODUCTION START")
+    logger.info("📱 Features: Excel/Text, Dedupe, Skip/Back, Click-to-Call")
     
     while True:
         try:
-            logger.info("Starting polling...")
-            bot.infinity_polling(
-                timeout=20,
-                long_polling_timeout=15
-            )
-        except KeyboardInterrupt:
-            logger.info("Shutdown requested")
-            break
+            bot.infinity_polling(timeout=20, long_polling_timeout=15)
         except Exception as e:
-            logger.error(f"Polling crashed: {e}")
-            logger.info("Restarting in 30 seconds...")
-            time.sleep(30)
-    
-    logger.info("Bot stopped")
-    conn.close()
+            logger.error(f"Polling error: {e}")
+            logger.info("Restarting in 15 seconds...")
+            time.sleep(15)
+
+print("PART 5 READY - SpeedCallerBot v3.0 COMPLETE!")
