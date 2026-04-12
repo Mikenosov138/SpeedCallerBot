@@ -4,7 +4,7 @@ import re
 import sqlite3
 import logging
 import time
-import telebot
+import telebotelse:
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import openpyxl
 import tempfile
@@ -107,7 +107,7 @@ def import_numbers(user_id, data, source="manual"):
                             numbers.append(str(cell))
         except:
             return 0
-  else:  # Text
+  else:    # Text
     numbers = [line.strip() for line in data.split('\n') if line.strip()]
     
     # UNIQUE импорт
