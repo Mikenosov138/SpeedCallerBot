@@ -293,44 +293,6 @@ def handle_text(message):
 @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
 def start_calling(call):
     send_current_number(call.message.chat.id, call.from_user.id)
-
-# ===== FLASK WEBHOOK =====
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    try:
-        if request.headers.get('content-type') != 'application/json':
-            abort(403)
-        json_data = request.get_json()
-        if json_data:
-            update = telebot.types.Update.de_json(json_data)
-            bot.process_new_updates([update])
-        return '', 200
-    except:
-        return '', 500
-
-@app.route('/')
-def index():
-    return "SpeedCallerBot v6 OK"
-
-# ===== НЕУБИВАЕМЫЙ ЗАПУСК =====
-def run_flask():
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
-
-if __name__ == "__main__":
-    logger.info("🚀 SpeedCallerBot v6 — FULLY ARMED")
-    
-    # Webhook setup
-    bot.remove_webhook()
-    time.sleep(3)
-    bot.set_webhook(url="https://speedcaller-bot-v2.onrender.com/webhook")
-    logger.info("✅ Webhook installed!")
-    
-    # Flask + Polling параллельно
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-    
-    logger.info("🔄 Hybrid mode: Webhook + Polling")
     
 # ===== SIMPLE Polling (без retry_after) =====
 def simple_polling():
@@ -351,3 +313,6 @@ if __name__ == "__main__":
     
     # Только polling (gunicorn не нужен для polling!)
     simple_polling()
+# ===== SIMPLE Polling =====
+def simple_polling():
+    logger
