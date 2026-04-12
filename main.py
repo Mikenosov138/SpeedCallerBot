@@ -6,7 +6,6 @@ import logging
 import time
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from flask import Flask, request, abort
 import openpyxl
 import tempfile
 import requests
@@ -18,9 +17,6 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
-
-# Flask
-app = Flask(__name__)
 
 # База UNIQUE номеров
 conn = sqlite3.connect("speedcaller_v6.db", check_same_thread=False)
@@ -294,9 +290,10 @@ def handle_text(message):
 def start_calling(call):
     send_current_number(call.message.chat.id, call.from_user.id)
     
-# ===== SIMPLE Polling (без retry_after) =====
+    
+# ===== SIMPLE POLLING =====
 def simple_polling():
-    logger.info("🔄 Simple polling...")
+    logger.info("🔄 SpeedCallerBot v6 — Polling START")
     while True:
         try:
             bot.polling(
@@ -305,14 +302,9 @@ def simple_polling():
                 timeout=20
             )
         except Exception as e:
-            logger.error(f"Polling crash: {e}")
+            logger.error(f"Polling restart: {e}")
             time.sleep(10)
 
 if __name__ == "__main__":
-    logger.info("🚀 SpeedCallerBot v6 — SIMPLE MODE")
-    
-    # Только polling (gunicorn не нужен для polling!)
+    logger.info("🚀 SpeedCallerBot v6 — FULLY ARMED")
     simple_polling()
-# ===== SIMPLE Polling =====
-def simple_polling():
-    logger
