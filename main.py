@@ -332,14 +332,22 @@ if __name__ == "__main__":
     
     logger.info("🔄 Hybrid mode: Webhook + Polling")
     
-    # Основной polling (ГАРАНТИЯ работы)
+# ===== SIMPLE Polling (без retry_after) =====
+def simple_polling():
+    logger.info("🔄 Simple polling...")
     while True:
         try:
-            bot.infinity_polling(
-                timeout=10,
-                long_polling_timeout=5,
-                retry_after=5
+            bot.polling(
+                non_stop=True,
+                interval=1,
+                timeout=20
             )
         except Exception as e:
-            logger.error(f"Polling restart: {e}")
+            logger.error(f"Polling crash: {e}")
             time.sleep(10)
+
+if __name__ == "__main__":
+    logger.info("🚀 SpeedCallerBot v6 — SIMPLE MODE")
+    
+    # Только polling (gunicorn не нужен для polling!)
+    simple_polling()
