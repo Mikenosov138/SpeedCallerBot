@@ -4,7 +4,7 @@ import re
 import sqlite3
 import logging
 import time
-import telebotelse:
+import telebot:
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import openpyxl
 import tempfile
