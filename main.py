@@ -378,11 +378,10 @@ def run_flask():
 if __name__ == "__main__":
     logger.info("🚀 SpeedCallerBot v5 — WEBHOOK ARMED")
     
-    # Устанавливаем webhook (только 1 раз при старте)
+    # УСТАНОВИ WEBHOOK!
     bot.remove_webhook()
     time.sleep(2)
-    bot.set_webhook(url=f"https://YOUR_RENDER_URL/{TOKEN}")
+    bot.set_webhook(url=f"https://speedcaller-bot-v2.onrender.com/{TOKEN}")  # ← ТВОЙ URL!
     
     # Запуск Flask
     run_flask()
-
