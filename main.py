@@ -76,7 +76,7 @@ def start_handler(message):
 # ===== НОРМАЛИЗАЦИЯ НОМЕРОВ ЛЮБОЙ СТРАНЫ =====
 def normalize_phone(phone):
     """+79123456789 из любого формата"""
-    clean = re.sub(r'[^\d+]', '', str(phone))  # Только цифры +
+clean = re.sub(r'[^\d+]', '', str(phone))  # ← ТОЧНО ТАК!
     
     if len(clean) < 8:
         return None
@@ -107,8 +107,8 @@ def import_numbers(user_id, data, source="manual"):
                             numbers.append(str(cell))
         except:
             return 0
-    else:  # Text
-        numbers = [line.strip() for line in data.split('\n') if line.strip()]
+   else:  # Text
+    numbers = [line.strip() for line in data.split('\n') if line.strip()]
     
     # UNIQUE импорт
     for phone in numbers:
