@@ -5,12 +5,7 @@ import sqlite3
 import logging
 import time
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from flask import Flask, request, abort
-import openpyxl
-import tempfile
-import requests
-import threading
+from telebot
 
 # Логи
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
