@@ -280,27 +280,29 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "⬅️ Назад")
         send_current_number(chat_id, user_id)
 
-# ===== Запуск WEBHOOK (ИСПРАВЛЕНО) =====
+# ===== ТОЛЬКО ОДИН webhook =====
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    """Telegram webhook endpoint"""
     if request.headers.get('content-type') == 'application/json':
         json_data = request.get_json()
         update = telebot.types.Update.de_json(json_data)
         bot.process_new_updates([update])
         return '', 200
-    else:
-        abort(403)
+    abort(403)
 
 @app.route('/')
 def index():
-    """Health check"""
     return "SpeedCallerBot v5 OK"
 
-def run_flask():
-    """Запуск Flask сервера"""
+if __name__ == "__main__":
+    logger.info("🚀 SpeedCallerBot v5 — WEBHOOK ARMED")
+    bot.remove_webhook()
+    time.sleep(3)
+    bot.set_webhook(url="https://speedcaller-bot-v2.onrender.com/webhook")
+    logger.info("✅ Webhook set!")
+    
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=port)
 
 if __name__ == "__main__":
     logger.info("🚀 SpeedCallerBot v5 — WEBHOOK ARMED")
