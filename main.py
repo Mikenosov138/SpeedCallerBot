@@ -280,32 +280,27 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "⬅️ Назад")
         send_current_number(chat_id, user_id)
 
-# ===== ТОЛЬКО ОДИН webhook =====
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    if request.headers.get('content-type') == 'application/json':
+    """Усиленный webhook"""
+    try:
+        if request.headers.get('content-type') != 'application/json':
+            abort(403)
+        
         json_data = request.get_json()
+        if not json_data:
+            return '', 200
+        
         update = telebot.types.Update.de_json(json_data)
-        bot.process_new_updates([update])
+        if update:
+            bot.process_new_updates([update])
+        
+        logger.info(f"✅ Webhook OK: update_id={update.update_id if update else 'None'}")
         return '', 200
-    abort(403)
-
-@app.route('/')
-def index():
-    return "SpeedCallerBot v5 OK"
-
-if __name__ == "__main__":
-    logger.info("🚀 SpeedCallerBot v5 — WEBHOOK ARMED")
-    bot.remove_webhook()
-    time.sleep(3)
-    bot.set_webhook(url="https://speedcaller-bot-v2.onrender.com/webhook")
-    logger.info("✅ Webhook set!")
-    
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
-
-if __name__ == "__main__":
-    logger.info("🚀 SpeedCallerBot v5 — WEBHOOK ARMED")
+        
+    except Exception as e:
+        logger.error(f"❌ Webhook error: {e}")
+        return '', 500
     
     # Устанавливаем webhook
     bot.remove_webhook()
@@ -319,3 +314,16 @@ if __name__ == "__main__":
     
     # Запуск Flask
     run_flask()
+
+# Fallback polling (если webhook не работает)
+def fallback_polling():
+    logger.info("🔄 Fallback polling...")
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+
+if __name__ == "__main__":
+    # webhook setup...
+    run_flask()
+    
+    # fallback через 60 сек если нет активности
+    time.sleep(60)
+    fallback_polling()
