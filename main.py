@@ -280,81 +280,8 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "⬅️ Назад")
         send_current_number(chat_id, user_id)
 
-# ===== Flask Webhook =====
-@app.route(f'/{TOKEN}', methods=['POST'])
-def webhook():
-    """Получение обновлений от Telegram"""
-    if request.headers.get('content-type') == 'application/json':
-        json_data = request.get_json()
-        update = telebot.types.Update.de_json(json_data)
-        bot.process_new_updates([update])
-        return ''
-    else:
-        abort(403)
-
-# ===== Обработка файлов и текста =====
-@bot.message_handler(content_types=['document'])
-def handle_excel(message):
-    """Обработка Excel файлов"""
-    user_id = message.from_user.id
-    if user_id in user_state and user_state[user_id].get('waiting_excel'):
-        try:
-            file_info = bot.get_file(message.document.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
-            
-            # Сохраняем временно
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
-                tmp.write(downloaded_file)
-                tmp_path = tmp.name
-            
-            # Импорт
-            count = import_numbers(user_id, tmp_path, "excel")
-            os.unlink(tmp_path)  # Удаляем временный файл
-            
-            # Кнопка старта
-            kb = InlineKeyboardMarkup()
-            kb.row(InlineKeyboardButton("🚀 НАЧАТЬ", callback_data="start_calling"))
-            
-            bot.reply_to(message, 
-                f"✅ **Загружено {count} уникальных номеров!**\n\nНажми НАЧАТЬ 👇", 
-                reply_markup=kb, parse_mode='Markdown')
-            
-            # Сбрасываем состояние
-            del user_state[user_id]['waiting_excel']
-            
-        except Exception as e:
-            bot.reply_to(message, f"❌ Ошибка Excel: {str(e)}")
-
-@bot.message_handler(func=lambda m: True)
-def handle_text_or_default(message):
-    """Текст номеров или дефолт"""
-    user_id = message.from_user.id
-    
-    # Если ждём текст номеров
-    if user_id in user_state and user_state[user_id].get('waiting_text'):
-        count = import_numbers(user_id, message.text, "text")
-        
-        kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("🚀 НАЧАТЬ", callback_data="start_calling"))
-        
-        bot.reply_to(message, 
-            f"✅ **Загружено {count} уникальных номеров!**\n\nНажми НАЧАТЬ 👇", 
-            reply_markup=kb, parse_mode='Markdown')
-        
-        del user_state[user_id]['waiting_text']
-    
-    # Любое другое сообщение = показываем текущий номер
-    else:
-        send_current_number(message.chat.id, user_id)
-
-# Дополнительный callback для старта
-@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
-def start_calling(call):
-    """Запуск просмотра номеров"""
-    send_current_number(call.message.chat.id, call.from_user.id)
-
-# ===== Запуск WEBHOOK =====
-@app.route(f'/{TOKEN}', methods=['POST'])
+# ===== Запуск WEBHOOK (ИСПРАВЛЕНО) =====
+@app.route('/webhook', methods=['POST'])
 def webhook():
     """Telegram webhook endpoint"""
     if request.headers.get('content-type') == 'application/json':
@@ -378,10 +305,15 @@ def run_flask():
 if __name__ == "__main__":
     logger.info("🚀 SpeedCallerBot v5 — WEBHOOK ARMED")
     
-    # УСТАНОВИ WEBHOOK!
+    # Устанавливаем webhook
     bot.remove_webhook()
-    time.sleep(2)
-    bot.set_webhook(url=f"https://speedcaller-bot-v2.onrender.com/{TOKEN}")  # ← ТВОЙ URL!
+    time.sleep(3)
+    
+    # ТВОЙ Render URL!
+    WEBHOOK_URL = "https://speedcaller-bot-v2.onrender.com/webhook"
+    bot.set_webhook(url=WEBHOOK_URL)
+    
+    logger.info(f"✅ Webhook set: {WEBHOOK_URL}")
     
     # Запуск Flask
     run_flask()
