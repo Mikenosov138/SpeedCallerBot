@@ -76,7 +76,7 @@ def start_handler(message):
 # ===== НОРМАЛИЗАЦИЯ НОМЕРОВ ЛЮБОЙ СТРАНЫ =====
 def normalize_phone(phone):
     """+79123456789 из любого формата"""
-clean = re.sub( r'[^\d+]', '', str(phone))  # ← ТОЧНО ТАК!
+clean = re.sub( r'[^\\d+]', '', str(phone))  # ❌ \\d+
     
     if len(clean) < 8:
         return None
