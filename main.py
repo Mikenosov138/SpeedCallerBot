@@ -74,22 +74,21 @@ def start_handler(message):
     last_messages[message.chat.id] = sent.message_id
 
 # ===== НОРМАЛИЗАЦИЯ НОМЕРОВ ЛЮБОЙ СТРАНЫ =====
-def normalize_phone(phone):
-    """+79123456789 из любого формата"""
-clean = re.sub( r'[^\\d+]', '', str(phone))  # ❌ \\d+
+def normalize_phone(phone):  # 0 пробелов (левый край)
+    """+79123456789 из любого формата"""  # 4 пробела
+    clean = re.sub(r'[^\d+]', '', str(phone))  # 4 пробела
+    if len(clean) < 8:  # 4 пробела
+        return None  # 8 пробелов
     
-    if len(clean) < 8:
-        return None
+    # Россия 8→7  # 4 пробела
+    if clean.startswith('8') and len(clean) == 11:  # 4 пробела
+        clean = '7' + clean[1:]  # 8 пробелов
     
-    # Россия 8→7
-    if clean.startswith('8') and len(clean) == 11:
-        clean = '7' + clean[1:]
+    # Добавляем +  # 4 пробела
+    if not clean.startswith('+'):  # 4 пробела
+        clean = '+' + clean  # 8 пробелов
     
-    # Добавляем +
-    if not clean.startswith('+'):
-        clean = '+' + clean
-    
-    return clean[-15:]  # E.164 max 15
+    return clean[-15:]  # 4 пробела
 
 # ===== ИМПОРТ EXCEL/TEXT =====
 def import_numbers(user_id, data, source="manual"):
