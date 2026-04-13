@@ -74,11 +74,7 @@ def start_handler(message):
     last_messages[message.chat.id] = sent.message_id
 
 # ===== НОРМАЛИЗАЦИЯ НОМЕРОВ ЛЮБОЙ СТРАНЫ =====
-def normalize_phone(phone):  # 0 пробелов (левый край)
-    """+79123456789 из любого формата"""  # 4 пробела
-    clean = re.sub(r'[^\d+]', '', str(phone))  # 4 пробела
-    if len(clean) < 8:  # 4 пробела
-        return None  # 8 пробелов
+def normalize_phone
     
     # Россия 8→7  # 4 пробела
     if clean.startswith('8') and len(clean) == 11:  # 4 пробела
