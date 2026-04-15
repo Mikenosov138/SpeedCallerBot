@@ -136,7 +136,7 @@ def get_current_number(user_id):
     return numbers[index], index, len(numbers)
 
 def send_current_number(chat_id, user_id):
-    """📱 Показать номер + кнопки"""
+    """Показать номер + кнопки"""  # ✅ Текст!
     delete_last_message(chat_id)
     
     number_data, index, total = get_current_number(user_id)
