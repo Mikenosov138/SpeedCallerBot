@@ -274,18 +274,5 @@ def start_calling(call):
     
 # ===== SIMPLE POLLING =====
 def simple_polling():
-    logger.info("🔄 SpeedCallerBot v6 — Polling START")
-    while True:
-        try:
-            bot.polling(
-                non_stop=True,
-                interval=1,
-                timeout=20
-            )
-        except Exception as e:
-            logger.error(f"Polling restart: {e}")
-            time.sleep(10)
+    logger.info("🔄 Speed
 
-if __name__ == "__main__":
-    logger.info("🚀 SpeedCallerBot v6 — FULLY ARMED")
-    simple_polling()
