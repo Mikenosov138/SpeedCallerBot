@@ -254,7 +254,7 @@ def handle_excel(message):
 
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
-    """Обработка текста"""  # ✅ Без эмодзи!
+    "Обработка текста"  # ОДНИ КАВЫЧКИ!
     user_id = message.from_user.id
     
     if user_id in user_state and user_state[user_id].get('waiting_text'):
