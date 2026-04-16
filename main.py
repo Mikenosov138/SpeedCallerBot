@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(TOKEN)
+bot.remove_webhook()  # ✅ Отключаем webhook!
+logger.info("✅ Webhook removed — Polling mode")
 
 # База UNIQUE номеров
 conn = sqlite3.connect("speedcaller_v6.db", check_same_thread=False)
