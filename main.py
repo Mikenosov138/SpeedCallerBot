@@ -75,9 +75,27 @@ def start_handler(message):
 
 # ===== НОРМАЛИЗАЦИЯ НОМЕРОВ ЛЮБОЙ СТРАНЫ =====
 def normalize_phone(phone):
-    """
+    """+79123456789 из любого формата"""
+    clean = re.sub(r'[^\d+]', '', str(phone))  # Убираем всё кроме цифр/+
+    if len(clean) < 8:
+        return None
     
-    # Excel
+    # Россия 8→7
+    if clean.startswith('8') and len(clean) == 11:
+        clean = '7' + clean[1:]
+    
+    # Добавляем +
+    if not clean.startswith('+'):
+        clean = '+' + clean
+    
+    return clean[-15:]  # E.164 формат
+
+# ===== ИМПОРТ EXCEL/TEXT =====
+def import_numbers(user_id, data, source="manual"):
+    """Импорт с UNIQUE номерами"""
+    count_added = 0
+    numbers = []
+    
     if source == "excel":
         try:
             wb = openpyxl.load_workbook(data)
@@ -88,8 +106,8 @@ def normalize_phone(phone):
                             numbers.append(str(cell))
         except:
             return 0
-  else:    # Text
-    numbers = [line.strip() for line in data.split('\n') if line.strip()]
+    else:  # Text
+        numbers = [line.strip() for line in data.split('\n') if line.strip()]
     
     # UNIQUE импорт
     for phone in numbers:
@@ -254,25 +272,33 @@ def handle_excel(message):
 
 @bot.message_handler(func=lambda m: True)
 def handle_text(message):
-    pass  # ✅ Без """ !
     user_id = message.from_user.id
     
     if user_id in user_state and user_state[user_id].get('waiting_text'):
         count = import_numbers(user_id, message.text, "text")
         kb = InlineKeyboardMarkup()
         kb.row(InlineKeyboardButton("🚀 НАЧАТЬ", callback_data="start_calling"))
-        bot.reply_to(message, f"✅ **{count} уникальных номеров!**\n🚀 Начать 👇", 
+        bot.reply_to(message, f"✅ **{count} уникальных номеров!**\\n🚀 Начать 👇", 
                     reply_markup=kb, parse_mode='Markdown')
         del user_state[user_id]['waiting_text']
     else:
         send_current_number(message.chat.id, user_id)
-
-@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
-def start_calling(call):
-    send_current_number(call.message.chat.id, call.from_user.id)
-    
     
 # ===== SIMPLE POLLING =====
 def simple_polling():
-    logger.info("🔄 Speed
+    logger.info("🔄 SpeedCallerBot v6 — Polling START")
+    while True:
+        try:
+            bot.polling(
+                non_stop=True,
+                interval=1,
+                timeout=20
+            )
+        except Exception as e:
+            logger.error(f"Polling restart: {e}")
+            time.sleep(10)
+
+if __name__ == "__main__":
+    logger.info("🚀 SpeedCallerBot v6 — FULLY ARMED")
+    simple_polling()
 
