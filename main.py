@@ -39,18 +39,18 @@ user_state = {}
 last_messages = {}
 
 WELCOME_TEXT = """
-👋 **SpeedCallerBot v6**
+👋 **SpeedCallerBot**
 
 📞 **Fast client database calling**
 
-**Максимум звонков:**
-• Excel/текст → номера
-• 📞 CALL → звонки  
-• ⏭️ SKIP → следующий
-• ⬅️ BACK → назад
+**How to use:**
+• 📊 Excel/📝 Text → numbers
+• 📞 CALL → dial ✓
+• ⏭️ SKIP → next
+• ⬅️ BACK → previous
 
-**НЕТ ЛИМИТОВ!**
-➕ Загрузить 👇
+**NO LIMITS!**
+➕ Load numbers 👇
 """
 
 def delete_last_message(chat_id):
@@ -172,12 +172,12 @@ def send_current_number(chat_id, user_id):
         num_id, phone = number_data
         
         kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
-        kb.row(
-            InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
-            InlineKeyboardButton("⬅️ BACK", callback_data="back")
-        )
-        kb.row(InlineKeyboardButton(f"📊 {index+1}/{total}", callback_data="stats"))
+kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
+kb.row(
+    InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
+    InlineKeyboardButton("⬅️ BACK", callback_data="back")
+)
+kb.row(InlineKeyboardButton(f"📊 {index+1}/{total}", callback_data="stats"))
         
         phone_display = phone.replace('+', '＋')  # Красивое +
         text = f"**📱 {phone_display}**\n\n**Прогресс:** `{index+1}/{total}`"
@@ -196,10 +196,10 @@ def callback_handler(call):
     # 📥 Меню загрузки
     if data == "load_menu":
         kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-        kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
-        kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
-        kb.row(InlineKeyboardButton("↩️ Back", callback_data="back_main"))
+kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
+kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
+kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
+kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
         bot.edit_message_text("📥 **Загрузить номера:**", chat_id, call.message.message_id, 
                             reply_markup=kb, parse_mode='Markdown')
     
