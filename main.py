@@ -161,7 +161,7 @@ def send_current_number(chat_id, user_id):
     if not number_data:
         sent = bot.send_message(
         chat_id, 
-        "📭 **Numbers finished!**\\n\\n✅ **Numbers loaded!** Press **🚀 START** to begin or **⬅️ BACK/SKIP** to page through...\\n\\n➕ Load new numbers 👇", 
+        "📭 **Numbers finished!**\\n\\n✅ **Numbers loaded!** Press **🚀 START** to begin or **⬅️ BACK/SKIP** to page through...\\n\\n➕ Load new numbers",  
         reply_markup=main_menu_keyboard(),
         parse_mode='Markdown'
     )
@@ -177,7 +177,7 @@ def send_current_number(chat_id, user_id):
         kb.row(InlineKeyboardButton(f"📊 {index+1}/{total}", callback_data="stats"))
         
         phone_display = phone.replace('+', '＋')
-        text = f"**👤 Client**  {phone_display}\\n\\n**📊 Progress:** `{index+1}/{total}`"
+        text = f"**👤 Client**  {phone_display}  **Progress:** `{index+1}/{total}`"
         
         sent = bot.send_message(chat_id, text, reply_markup=kb, parse_mode='Markdown')
     
@@ -276,7 +276,7 @@ def handle_numbers(message):
     kb = InlineKeyboardMarkup()
     kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
     
-    bot.reply_to(message, f"✅ **{count} unique numbers!**\\n🚀 START 👇", 
+    bot.reply_to(message, f"✅ **{count} numbers loaded!** Press **🚀 START** to begin calling or add more numbers!",  
                 reply_markup=kb, parse_mode='Markdown')
 
 @bot.message_handler(func=lambda m: m.text and not m.text.startswith('/'))
