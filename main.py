@@ -44,13 +44,13 @@ WELCOME_TEXT = """
 📞 **Fast client database calling**
 
 **How to use:**
-• 📊 Excel/📝 Text → numbers
-• 📞 CALL → dial ✓
-• ⏭️ SKIP → next
-• ⬅️ BACK → previous
+• 📎 Send **Excel** file (.xlsx) 
+• 📝 Send **Text** numbers (line by line)
+• 📞 **CALL** → dial ✓
+• ⏭️ **SKIP** → next
+• ⬅️ **BACK** → previous
 
-**NO LIMITS!**
-➕ Load numbers 👇
+**NO LIMITS!** Send file/message 👇
 """
 
 def delete_last_message(chat_id):
@@ -61,17 +61,15 @@ def delete_last_message(chat_id):
             pass
 
 def main_menu_keyboard():
-    kb = InlineKeyboardMarkup()
-    kb.row(InlineKeyboardButton("➕ Load Numbers", callback_data="load_menu"))
-    return kb
+    return None  # No keyboard
 
 @bot.message_handler(commands=['start'])
 def start_handler(message):
     delete_last_message(message.chat.id)
     sent = bot.send_message(
-        message.chat.id, WELCOME_TEXT, 
-        reply_markup=main_menu_keyboard(), 
-        parse_mode='Markdown'
+    message.chat.id, WELCOME_TEXT, 
+    reply_markup=None,  # No buttons
+    parse_mode='Markdown'
     )
     last_messages[message.chat.id] = sent.message_id
 
