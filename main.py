@@ -262,30 +262,19 @@ def handle_excel(message):
                 tmp.write(downloaded_file)
                 tmp_path = tmp.name
             
-    count = import_numbers(user_id, tmp_path, "excel")
-    
-    kb = InlineKeyboardMarkup()
-    kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))  # ← ЗДЕСЬ!
-    
-    bot.reply_to(message, f"✅ **{count} unique numbers!**\\n🚀 START calling 👇", 
-                reply_markup=kb, parse_mode='Markdown')
+            count = import_numbers(user_id, tmp_path, "excel")
+            
+            kb = InlineKeyboardMarkup()
+            kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
+            
+            bot.reply_to(message, f"✅ **{count} unique numbers!**\\n🚀 START calling 👇", 
+                        reply_markup=kb, parse_mode='Markdown')
             del user_state[user_id]['waiting_excel']
+            
         except Exception as e:
-            bot.reply_to(message, f"❌ Excel: {str(e)}")
-
-@bot.message_handler(func=lambda m: True)
-def handle_text(message):
-    user_id = message.from_user.id
-    
-    if user_id in user_state and user_state[user_id].get('waiting_text'):
-        count = import_numbers(user_id, message.text, "text")
-        kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
-        bot.reply_to(message, f"✅ **{count} уникальных номеров!**\\n🚀 Начать 👇", 
-                    reply_markup=kb, parse_mode='Markdown')
-        del user_state[user_id]['waiting_text']
+            bot.reply_to(message, f"❌ Excel error: {str(e)}")
     else:
-        send_current_number(message.chat.id, user_id)
+        bot.reply_to(message, "📎 Send Excel in **Load Excel** mode")
     
 # ===== SIMPLE POLLING =====
 def simple_polling():
