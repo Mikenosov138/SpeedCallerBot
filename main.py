@@ -249,11 +249,13 @@ def callback_handler(call):
         send_current_number(chat_id, user_id)
 
 # ===== ОБРАБОТКА ФАЙЛОВ EXCEL/TEXT =====
-@bot.message_handler(content_types=['document'])
-def handle_excel(message):
-    """Excel импорт"""
+@bot.message_handler(content_types=['document', 'text'])
+def handle_numbers(message):
+    """📎 Excel + 📝 Text — ЛЮБОЙ файл/текст"""
     user_id = message.from_user.id
-    if user_id in user_state and user_state[user_id].get('waiting_excel'):
+    
+    if message.document and message.document.file_name.endswith('.xlsx'):
+        # Excel
         try:
             file_info = bot.get_file(message.document.file_id)
             downloaded_file = bot.download_file(file_info.file_path)
@@ -263,18 +265,24 @@ def handle_excel(message):
                 tmp_path = tmp.name
             
             count = import_numbers(user_id, tmp_path, "excel")
-            
-            kb = InlineKeyboardMarkup()
-            kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
-            
-            bot.reply_to(message, f"✅ **{count} unique numbers!**\\n🚀 START calling 👇", 
-                        reply_markup=kb, parse_mode='Markdown')
-            del user_state[user_id]['waiting_excel']
-            
-        except Exception as e:
-            bot.reply_to(message, f"❌ Excel error: {str(e)}")
+        except:
+            bot.reply_to(message, "❌ Excel error!")
+            return
     else:
-        bot.reply_to(message, "📎 Send Excel in **Load Excel** mode")
+        # Text (любые сообщения)
+        count = import_numbers(user_id, message.text, "text")
+    
+    # ✅ Кнопка START всегда
+    kb = InlineKeyboardMarkup()
+    kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
+    
+    bot.reply_to(message, f"✅ **{count} unique numbers!**\\n🚀 START 👇", 
+                reply_markup=kb, parse_mode='Markdown')
+
+@bot.message_handler(func=lambda m: m.text and not m.text.startswith('/'))
+def show_number(message):
+    """Показ номера при обычных сообщениях"""
+    send_current_number(message.chat.id, message.from_user.id)
     
 # ===== SIMPLE POLLING =====
 def simple_polling():
