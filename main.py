@@ -156,7 +156,6 @@ def get_current_number(user_id):
     return numbers[index], index, len(numbers)
 
 def send_current_number(chat_id, user_id):
-    """Показать номер + кнопки"""  # ✅ Текст!
     delete_last_message(chat_id)
     
     number_data, index, total = get_current_number(user_id)
@@ -164,7 +163,7 @@ def send_current_number(chat_id, user_id):
     if not number_data:
         sent = bot.send_message(
             chat_id, 
-            "📭 **Номера закончились!**\n\n➕ Загрузить новые", 
+            "📭 **Numbers finished!**\\n\\n➕ Load new", 
             reply_markup=main_menu_keyboard(),
             parse_mode='Markdown'
         )
@@ -172,15 +171,15 @@ def send_current_number(chat_id, user_id):
         num_id, phone = number_data
         
         kb = InlineKeyboardMarkup()
-kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
-kb.row(
-    InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
-    InlineKeyboardButton("⬅️ BACK", callback_data="back")
-)
-kb.row(InlineKeyboardButton(f"📊 {index+1}/{total}", callback_data="stats"))
+        kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
+        kb.row(
+            InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
+            InlineKeyboardButton("⬅️ BACK", callback_data="back")
+        )
+        kb.row(InlineKeyboardButton(f"📊 {index+1}/{total}", callback_data="stats"))
         
-        phone_display = phone.replace('+', '＋')  # Красивое +
-        text = f"**📱 {phone_display}**\n\n**Прогресс:** `{index+1}/{total}`"
+        phone_display = phone.replace('+', '＋')  # Pretty +
+        text = f"**📱 {phone_display}**\\n\\n**Progress:** `{index+1}/{total}`"
         
         sent = bot.send_message(chat_id, text, reply_markup=kb, parse_mode='Markdown')
     
