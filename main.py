@@ -159,12 +159,12 @@ def send_current_number(chat_id, user_id):
     number_data, index, total = get_current_number(user_id)
     
     if not number_data:
-        sent = bot.send_message(
-            chat_id, 
-            "📭 **Numbers finished!**\\n\\n➕ Load new", 
-            reply_markup=main_menu_keyboard(),
-            parse_mode='Markdown'
-        )
+    sent = bot.send_message(
+        chat_id, 
+        "📭 **Numbers finished!**\\n\\n✅ **Numbers loaded!** Press **🚀 START** to begin or **⬅️ BACK/SKIP** to page through...\\n\\n➕ Load new numbers 👇", 
+        reply_markup=main_menu_keyboard(),
+        parse_mode='Markdown'
+    )
     else:
         num_id, phone = number_data
         
@@ -176,8 +176,8 @@ def send_current_number(chat_id, user_id):
         )
         kb.row(InlineKeyboardButton(f"📊 {index+1}/{total}", callback_data="stats"))
         
-        phone_display = phone.replace('+', '＋')  # Pretty +
-        text = f"**📱 {phone_display}**\\n\\n**Progress:** `{index+1}/{total}`"
+        phone_display = phone.replace('+', '＋')
+        text = f"**👤 Client**  {phone_display}\\n\\n**📊 Progress:** `{index+1}/{total}`"
         
         sent = bot.send_message(chat_id, text, reply_markup=kb, parse_mode='Markdown')
     
