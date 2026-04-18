@@ -192,22 +192,22 @@ def callback_handler(call):
     chat_id = call.message.chat.id
     data = call.data
     
-    # 📥 Меню загрузки
+    # Load menu
     if data == "load_menu":
         kb = InlineKeyboardMarkup()
-kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
-kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
-kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
-bot.edit_message_text("📥 **Load numbers:**", chat_id, call.message.message_id, 
-                            reply_markup=kb, parse_mode='Markdown')
+        kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
+        kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
+        kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
+        kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
+        bot.edit_message_text("📥 **Load numbers:**", chat_id, call.message.message_id, 
+                              reply_markup=kb, parse_mode='Markdown')
     
     elif data == "load_excel":
-        bot.answer_callback_query(call.id, "📎 Отправь Excel (.xlsx)")
+        bot.answer_callback_query(call.id, "📎 Send Excel (.xlsx)")
         user_state[user_id] = {'waiting_excel': True}
     
     elif data == "load_text":
-        bot.answer_callback_query(call.id, "📝 Отправь номера по строкам")
+        bot.answer_callback_query(call.id, "📝 Send numbers line by line")
         user_state[user_id] = {'waiting_text': True}
     
     elif data == "clear_all":
