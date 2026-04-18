@@ -189,11 +189,13 @@ def callback_handler(call):
     user_id = call.from_user.id
     chat_id = call.message.chat.id
     data = call.data
-    elif data == "start_calling":
-    send_current_number(chat_id, user_id)
+    
+    # Start calling
+    if data == "start_calling":
+        send_current_number(chat_id, user_id)
     
     # Load menu
-    if data == "load_menu":
+    elif data == "load_menu":
         kb = InlineKeyboardMarkup()
         kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
         kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
@@ -205,6 +207,7 @@ def callback_handler(call):
     elif data == "load_excel":
         bot.answer_callback_query(call.id, "📎 Send Excel (.xlsx)")
         user_state[user_id] = {'waiting_excel': True}
+    
     
     elif data == "load_text":
         bot.answer_callback_query(call.id, "📝 Send numbers line by line")
