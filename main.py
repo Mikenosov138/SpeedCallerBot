@@ -191,6 +191,8 @@ def callback_handler(call):
     user_id = call.from_user.id
     chat_id = call.message.chat.id
     data = call.data
+    elif data == "start_calling":
+    send_current_number(chat_id, user_id)
     
     # Load menu
     if data == "load_menu":
@@ -259,14 +261,13 @@ def handle_excel(message):
                 tmp.write(downloaded_file)
                 tmp_path = tmp.name
             
-            count = import_numbers(user_id, tmp_path, "excel")
-            os.unlink(tmp_path)
-            
-            kb = InlineKeyboardMarkup()
-            kb.row(InlineKeyboardButton("🚀 НАЧАТЬ", callback_data="start_calling"))
-            
-            bot.reply_to(message, f"✅ **{count} уникальных номеров!**\n🚀 Начать 👇", 
-                        reply_markup=kb, parse_mode='Markdown')
+    count = import_numbers(user_id, tmp_path, "excel")
+    
+    kb = InlineKeyboardMarkup()
+    kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))  # ← ЗДЕСЬ!
+    
+    bot.reply_to(message, f"✅ **{count} unique numbers!**\\n🚀 START calling 👇", 
+                reply_markup=kb, parse_mode='Markdown')
             del user_state[user_id]['waiting_excel']
         except Exception as e:
             bot.reply_to(message, f"❌ Excel: {str(e)}")
@@ -278,7 +279,7 @@ def handle_text(message):
     if user_id in user_state and user_state[user_id].get('waiting_text'):
         count = import_numbers(user_id, message.text, "text")
         kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("🚀 НАЧАТЬ", callback_data="start_calling"))
+        kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
         bot.reply_to(message, f"✅ **{count} уникальных номеров!**\\n🚀 Начать 👇", 
                     reply_markup=kb, parse_mode='Markdown')
         del user_state[user_id]['waiting_text']
