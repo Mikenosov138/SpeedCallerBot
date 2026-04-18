@@ -199,7 +199,7 @@ kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
 kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
 kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
 kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
-        bot.edit_message_text("📥 **Загрузить номера:**", chat_id, call.message.message_id, 
+bot.edit_message_text("📥 **Load numbers:**", chat_id, call.message.message_id, 
                             reply_markup=kb, parse_mode='Markdown')
     
     elif data == "load_excel":
