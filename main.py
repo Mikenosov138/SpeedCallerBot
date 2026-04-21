@@ -195,18 +195,18 @@ def callback_handler(call):
         send_current_number(chat_id, user_id)
         
     elif data == "remove_duplicates":
-    cursor.execute("""
-        DELETE FROM numbers
-        WHERE id NOT IN (
-            SELECT MIN(id)
-            FROM numbers
-            WHERE user_id=?
-            GROUP BY phone
-        ) AND user_id=?
-    """, (user_id, user_id))
-    conn.commit()
-    bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
-    
+        cursor.execute("""
+            DELETE FROM numbers
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM numbers
+                WHERE user_id=?
+                GROUP BY phone
+            ) AND user_id=?
+        """, (user_id, user_id))
+        conn.commit()
+        bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
+        
     # Load menu
     elif data == "load_menu":
         kb = InlineKeyboardMarkup()
@@ -222,7 +222,6 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "📎 Send Excel (.xlsx)")
         user_state[user_id] = {'waiting_excel': True}
     
-    
     elif data == "load_text":
         bot.answer_callback_query(call.id, "📝 Send numbers line by line")
         user_state[user_id] = {'waiting_text': True}
@@ -236,7 +235,7 @@ def callback_handler(call):
     
     elif data == "back_main":
         bot.edit_message_text(WELCOME_TEXT, chat_id, call.message.message_id, 
-                            reply_markup=main_menu_keyboard(), parse_mode='Markdown')
+                              reply_markup=main_menu_keyboard(), parse_mode='Markdown')
     
     elif data.startswith("call_"):
         num_id = int(data.split("_")[1])
