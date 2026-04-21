@@ -161,7 +161,7 @@ def send_current_number(chat_id, user_id):
     if not number_data:
         sent = bot.send_message(
         chat_id, 
-        "📭 **Numbers finished!**\\n\\n✅ **Numbers loaded!** Press **🚀 START** to begin or **⬅️ BACK/SKIP** to page through...\\n\\n➕ Load new numbers",  
+        "📭 **Numbers finished!**\n✅ **Numbers loaded!** Press **🚀 START** to begin or **⬅️ BACK/SKIP** to page through...\n➕ Load new numbers"
         reply_markup=main_menu_keyboard(),
         parse_mode='Markdown'
     )
@@ -198,7 +198,7 @@ def callback_handler(call):
     elif data == "load_menu":
         kb = InlineKeyboardMarkup()
         kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-        kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
+        kb.row(InlineKeyboardButton("↩️ Return to call", callback_data="start_calling"))
         kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
         kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
         bot.edit_message_text("📥 **Load numbers:**", chat_id, call.message.message_id, 
