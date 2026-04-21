@@ -193,6 +193,19 @@ def callback_handler(call):
     # Start calling
     if data == "start_calling":
         send_current_number(chat_id, user_id)
+        
+    elif data == "remove_duplicates":
+    cursor.execute("""
+        DELETE FROM numbers
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM numbers
+            WHERE user_id=?
+            GROUP BY phone
+        ) AND user_id=?
+    """, (user_id, user_id))
+    conn.commit()
+    bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
     
     # Load menu
     elif data == "load_menu":
@@ -200,6 +213,7 @@ def callback_handler(call):
         kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
         kb.row(InlineKeyboardButton("↩️ Return to call", callback_data="start_calling"))
         kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
+        kb.row(InlineKeyboardButton("🧹 Remove duplicates", callback_data="remove_duplicates"))
         kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
         bot.edit_message_text("📥 **Load numbers:**", chat_id, call.message.message_id, 
                               reply_markup=kb, parse_mode='Markdown')
@@ -216,7 +230,8 @@ def callback_handler(call):
     elif data == "clear_all":
         cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
         conn.commit()
-        bot.answer_callback_query(call.id, "🗑️ Очищено!")
+        user_state[user_id] = {'index': 0}
+        bot.answer_callback_query(call.id, "🗑️ Cleared!")
         send_current_number(chat_id, user_id)
     
     elif data == "back_main":
@@ -258,12 +273,14 @@ def handle_numbers(message):
                 tmp_path = tmp.name
             
             count = import_numbers(user_id, tmp_path, "excel")
+            user_state[user_id] = {'index': 0}
         except:
             bot.reply_to(message, "❌ Excel error!")
             return
     else:
         # Text (любые сообщения)
         count = import_numbers(user_id, message.text, "text")
+        user_state[user_id] = {'index': 0}
     
     # ✅ Кнопка START всегда
     kb = InlineKeyboardMarkup()
