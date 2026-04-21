@@ -158,14 +158,13 @@ def send_current_number(chat_id, user_id):
     
     number_data, index, total = get_current_number(user_id)
     
-     if not number_data:
-    sent = bot.send_message(
-        chat_id,
-        "📭 **Numbers finished!** ✅ **Numbers loaded!** Press **🚀 START** to begin or **⬅️ BACK/SKIP** to page through... ➕ Load new numbers",
-        reply_markup=main_menu_keyboard(),
-        parse_mode='Markdown'
-    )
-
+    if not number_data:
+        sent = bot.send_message(
+            chat_id,
+            "📭 **Numbers finished!** ✅ **Numbers loaded!** Press **🚀 START** to begin or **⬅️ BACK/SKIP** to page through... ➕ Load new numbers",
+            reply_markup=main_menu_keyboard(),
+            parse_mode='Markdown'
+        )
     else:
         num_id, phone = number_data
         
