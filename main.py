@@ -174,7 +174,7 @@ def send_current_number(chat_id, user_id):
             InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
             InlineKeyboardButton("⬅️ BACK", callback_data="back")
         )
-        kb.row(InlineKeyboardButton(f"📊 {index+1}/{total}", callback_data="stats"))
+        kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="load_menu"))
         
         phone_display = phone.replace('+', '＋')
         text = f"**👤 Client**  {phone_display}  **Progress:** `{index+1}/{total}`"
@@ -222,13 +222,6 @@ def callback_handler(call):
     elif data == "back_main":
         bot.edit_message_text(WELCOME_TEXT, chat_id, call.message.message_id, 
                             reply_markup=main_menu_keyboard(), parse_mode='Markdown')
-    
-    elif data == "stats":
-        cursor.execute("SELECT COUNT(*) FROM numbers WHERE user_id=? AND status='pending'", (user_id,))
-        pending = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM numbers WHERE user_id=?", (user_id,))
-        total = cursor.fetchone()[0]
-        bot.answer_callback_query(call.id, f"📊 {pending}/{total}")
     
     elif data.startswith("call_"):
         num_id = int(data.split("_")[1])
