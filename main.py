@@ -241,8 +241,8 @@ def callback_handler(call):
         chat_id,
         call.message.message_id,
         reply_markup=kb,
-        parse_mode='Markdown'
-    )
+        parse_mode='Markdown')
+    
     elif data == "back_main":
         bot.edit_message_text(WELCOME_TEXT, chat_id, call.message.message_id, 
                               reply_markup=main_menu_keyboard(), parse_mode='Markdown')
