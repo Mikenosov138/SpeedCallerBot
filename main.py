@@ -227,22 +227,22 @@ def callback_handler(call):
         user_state[user_id] = {'waiting_text': True}
     
     elif data == "clear_all":
-    cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
-    conn.commit()
-    user_state[user_id] = {'index': 0}
+        cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
+        conn.commit()
+        user_state[user_id] = {'index': 0}
 
-    kb = InlineKeyboardMarkup()
-    kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-    kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
-    kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="back_main"))
+        kb = InlineKeyboardMarkup()
+        kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
+        kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
+        kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="back_main"))
 
-    bot.edit_message_text(
-        "🗑️ **Numbers cleared!**\n\n📥 Upload new numbers:",
-        chat_id,
-        call.message.message_id,
-        reply_markup=kb,
-        parse_mode='Markdown'
-    )
+        bot.edit_message_text(
+            "🗑️ **Numbers cleared!**\n\n📥 Upload new numbers:",
+            chat_id,
+            call.message.message_id,
+            reply_markup=kb,
+            parse_mode='Markdown'
+        )
     
     elif data == "back_main":
         bot.edit_message_text(WELCOME_TEXT, chat_id, call.message.message_id, 
