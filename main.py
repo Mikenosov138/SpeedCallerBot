@@ -321,20 +321,21 @@ def show_number(message):
     send_current_number(message.chat.id, message.from_user.id)
     
 # ===== SIMPLE POLLING =====
-def simple_polling():
-    logger.info("🔄 SpeedCallerBot v6 — Polling START")
-    while True:
-        try:
-            bot.polling(
-                non_stop=True,
-                interval=1,
-                timeout=20
-            )
-        except Exception as e:
-            logger.error(f"Polling restart: {e}")
-            time.sleep(10)
+import time
+from telebot.apihelper import ApiTelegramException
 
-if __name__ == "__main__":
-    logger.info("🚀 SpeedCallerBot v6 — FULLY ARMED")
+bot.remove_webhook()
+
+while True:
+    try:
+        bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
+    except ApiTelegramException as e:
+        if "409" in str(e):
+            time.sleep(3)
+            continue
+        raise
+    except Exception as e:
+        time.sleep(3)
+        continue
     simple_polling()
 
