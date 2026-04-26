@@ -127,7 +127,16 @@ def import_numbers(user_id, data, source="manual"):
     logger.info(f"User {user_id}: +{count_added} номеров")
     return count_added
 
-# ===== НАВИГАЦИЯ НОМЕРАМИ =====
+import re
+
+def clean_phone(phone):
+    phone = str(phone).strip()
+    phone = re.sub(r"[^\d+]", "", phone)
+    if not phone.startswith("+"):
+        phone = "+" + phone
+    return phone
+
+
 def get_user_numbers(user_id):
     """Pending номера пользователя"""
     cursor.execute("""
@@ -136,6 +145,7 @@ def get_user_numbers(user_id):
         ORDER BY created_at ASC
     """, (user_id,))
     return cursor.fetchall()
+
 
 def get_current_number(user_id):
     """Текущий номер + прогресс"""
@@ -153,6 +163,7 @@ def get_current_number(user_id):
     
     return numbers[index], index, len(numbers)
 
+
 def send_current_number(chat_id, user_id):
     delete_last_message(chat_id)
     
@@ -167,22 +178,27 @@ def send_current_number(chat_id, user_id):
         )
     else:
         num_id, phone = number_data
+        phone_e164 = clean_phone(phone)
         
         kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
+        kb.row(InlineKeyboardButton("📞 CALL", url=f"tel:{phone_e164}"))
         kb.row(
             InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
             InlineKeyboardButton("⬅️ BACK", callback_data="back")
         )
         kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="load_menu"))
         
-        phone_display = phone.replace('+', '＋')
-        text = f"**👤 Client**  {phone_display}  **Progress:** `{index+1}/{total}`"
+        text = f'👤 Client: <a href="tel:{phone_e164}">{phone_e164}</a>\nProgress: {index+1}/{total}'
         
-        sent = bot.send_message(chat_id, text, reply_markup=kb, parse_mode='Markdown')
+        sent = bot.send_message(
+            chat_id,
+            text,
+            reply_markup=kb,
+            parse_mode='HTML'
+        )
     
     last_messages[chat_id] = sent.message_id
-
+    
 # ===== ОБРАБОТЧИКИ КНОПОК =====
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
