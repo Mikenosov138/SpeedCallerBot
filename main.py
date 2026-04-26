@@ -311,14 +311,18 @@ def handle_numbers(message):
     # ✅ Кнопка START всегда
     kb = InlineKeyboardMarkup()
     kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
-    
-    bot.reply_to(message, f"✅ **{count} numbers loaded!** Press **🚀 START** to begin calling or add more numbers!",  
-                reply_markup=kb, parse_mode='Markdown')
 
-@bot.message_handler(func=lambda m: m.text and not m.text.startswith('/'))
-def show_number(message):
-    """Показ номера при обычных сообщениях"""
-    send_current_number(message.chat.id, message.from_user.id)
+    bot.reply_to(
+        message,
+        f"✅ **{count} numbers loaded!** Press **🚀 START** to begin calling or add more numbers!",
+        reply_markup=kb,
+        parse_mode='Markdown'
+    )
+
+@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
+def start_calling(call):
+    bot.answer_callback_query(call.id)
+    send_current_number(call.message.chat.id, call.from_user.id)
     
 # ===== SIMPLE POLLING =====
 import time
