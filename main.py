@@ -313,15 +313,18 @@ def handle_numbers(message):
     kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
 
     bot.reply_to(
-        message,
-        f"✅ **{count} numbers loaded!** Press **🚀 START** to begin calling or add more numbers!",
-        reply_markup=kb,
-        parse_mode='Markdown'
-    )
+    message,
+    f"✅ {count} numbers loaded! Press 🚀 START to begin calling or add more numbers!",
+    reply_markup=kb
+)
 
 @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
 def start_calling(call):
     bot.answer_callback_query(call.id)
+    number_data, index, total = get_current_number(call.from_user.id)
+    if not number_data:
+        bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
+        return
     send_current_number(call.message.chat.id, call.from_user.id)
     
 # ===== SIMPLE POLLING =====
@@ -338,8 +341,9 @@ while True:
             time.sleep(3)
             continue
         raise
-    except Exception as e:
+    except Exception:
         time.sleep(3)
+        continue
         continue
     simple_polling()
 
