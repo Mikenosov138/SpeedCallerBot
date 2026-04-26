@@ -181,7 +181,7 @@ def send_current_number(chat_id, user_id):
         phone_e164 = clean_phone(phone)
         
         kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("📞 CALL", url=f"tel:{phone_e164}"))
+        kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
         kb.row(
             InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
             InlineKeyboardButton("⬅️ BACK", callback_data="back")
@@ -200,16 +200,40 @@ def send_current_number(chat_id, user_id):
     last_messages[chat_id] = sent.message_id
     
 # ===== ОБРАБОТЧИКИ КНОПОК =====
+@bot.callback_query_handler(func=lambda call: call.data.startswith("call_"))
+def handle_call(call):
+    bot.answer_callback_query(call.id)
+
+    num_id = int(call.data.split("_", 1)[1])
+
+    cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (num_id,))
+    conn.commit()
+
+    cursor.execute("SELECT phone, user_id FROM numbers WHERE id=?", (num_id,))
+    row = cursor.fetchone()
+    if not row:
+        bot.send_message(call.message.chat.id, "❌ Number not found.")
+        return
+
+    phone, user_id = row
+    phone_e164 = clean_phone(phone)
+
+    bot.send_message(call.message.chat.id, f"📞 Number: {phone_e164}")
+
+    user_state[user_id]['index'] += 1
+    send_current_number(call.message.chat.id, user_id)
+
+
 @bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
-    user_id = call.from_user.id
-    chat_id = call.message.chat.id
+def handle_buttons(call):
     data = call.data
-    
-    # Start calling
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id
+
     if data == "start_calling":
+        bot.answer_callback_query(call.id)
         send_current_number(chat_id, user_id)
-        
+
     elif data == "remove_duplicates":
         cursor.execute("""
             DELETE FROM numbers
@@ -222,8 +246,7 @@ def callback_handler(call):
         """, (user_id, user_id))
         conn.commit()
         bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
-        
-    # Load menu
+
     elif data == "load_menu":
         kb = InlineKeyboardMarkup()
         kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
@@ -231,17 +254,16 @@ def callback_handler(call):
         kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
         kb.row(InlineKeyboardButton("🧹 Remove duplicates", callback_data="remove_duplicates"))
         kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
-        bot.edit_message_text("📥 **Load numbers:**", chat_id, call.message.message_id, 
-                              reply_markup=kb, parse_mode='Markdown')
-    
+        bot.edit_message_text("📥 Load numbers:", chat_id, call.message.message_id, reply_markup=kb)
+
     elif data == "load_excel":
         bot.answer_callback_query(call.id, "📎 Send Excel (.xlsx)")
         user_state[user_id] = {'waiting_excel': True}
-    
+
     elif data == "load_text":
         bot.answer_callback_query(call.id, "📝 Send numbers line by line")
         user_state[user_id] = {'waiting_text': True}
-    
+
     elif data == "clear_all":
         cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
         conn.commit()
@@ -253,30 +275,25 @@ def callback_handler(call):
         kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="back_main"))
 
         bot.edit_message_text(
-            "🗑️ **Numbers cleared!**\n\n📥 Upload new numbers:",
+            "🗑️ Numbers cleared!\n\n📥 Upload new numbers:",
             chat_id,
             call.message.message_id,
-            reply_markup=kb,
-            parse_mode='Markdown'
+            reply_markup=kb
         )
-    
+
     elif data == "back_main":
-        bot.edit_message_text(WELCOME_TEXT, chat_id, call.message.message_id, 
-                              reply_markup=main_menu_keyboard(), parse_mode='Markdown')
-    
-    elif data.startswith("call_"):
-        num_id = int(data.split("_")[1])
-        cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (num_id,))
-        conn.commit()
-        bot.answer_callback_query(call.id, "📞 Звони!")
-        user_state[user_id]['index'] += 1
-        send_current_number(chat_id, user_id)
-    
+        bot.edit_message_text(
+            WELCOME_TEXT,
+            chat_id,
+            call.message.message_id,
+            reply_markup=main_menu_keyboard()
+        )
+
     elif data == "skip":
         user_state[user_id]['index'] += 1
         bot.answer_callback_query(call.id, "⏭️ Пропущено!")
         send_current_number(chat_id, user_id)
-    
+
     elif data == "back":
         user_state[user_id]['index'] = max(0, user_state[user_id]['index'] - 1)
         bot.answer_callback_query(call.id, "⬅️ Назад")
