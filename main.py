@@ -287,46 +287,48 @@ def callback_handler(call):
 def handle_numbers(message):
     """📎 Excel + 📝 Text — ЛЮБОЙ файл/текст"""
     user_id = message.from_user.id
-    
+
     if message.document and message.document.file_name.endswith('.xlsx'):
-        # Excel
         try:
             file_info = bot.get_file(message.document.file_id)
             downloaded_file = bot.download_file(file_info.file_path)
-            
+
             with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
                 tmp.write(downloaded_file)
                 tmp_path = tmp.name
-            
+
             count = import_numbers(user_id, tmp_path, "excel")
             user_state[user_id] = {'index': 0}
         except:
             bot.reply_to(message, "❌ Excel error!")
             return
     else:
-        # Text (любые сообщения)
+        if not message.text:
+            return
         count = import_numbers(user_id, message.text, "text")
         user_state[user_id] = {'index': 0}
-    
-    # ✅ Кнопка START всегда
+
     kb = InlineKeyboardMarkup()
     kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
 
     bot.reply_to(
-    message,
-    f"✅ {count} numbers loaded! Press 🚀 START to begin calling or add more numbers!",
-    reply_markup=kb
-)
+        message,
+        f"✅ {count} numbers loaded! Press 🚀 START to begin calling or add more numbers!",
+        reply_markup=kb
+    )
 
+# ===== START CALLING =====
 @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
 def start_calling(call):
     bot.answer_callback_query(call.id)
+
     number_data, index, total = get_current_number(call.from_user.id)
     if not number_data:
         bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
         return
+
     send_current_number(call.message.chat.id, call.from_user.id)
-    
+
 # ===== SIMPLE POLLING =====
 import time
 from telebot.apihelper import ApiTelegramException
@@ -344,6 +346,4 @@ while True:
     except Exception:
         time.sleep(3)
         continue
-        continue
-    simple_polling()
 
