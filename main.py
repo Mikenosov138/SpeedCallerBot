@@ -222,15 +222,16 @@ def send_current_number(chat_id, user_id):
     
     last_messages[chat_id] = sent.message_id
     
-# ===== ОБРАБОТЧИКИ КНОПОК =====
+# ===== ОБРАБОТЧИК КНОПКИ CALL =====
 @bot.callback_query_handler(func=lambda call: call.data.startswith("call_"))
 def handle_call(call):
     bot.answer_callback_query(call.id)
 
-    num_id = int(call.data.split("_", 1)[1])
-
-    cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (num_id,))
-    conn.commit()
+    try:
+        num_id = int(call.data.split("_", 1)[1])
+    except:
+        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
+        return
 
     cursor.execute("SELECT phone, user_id FROM numbers WHERE id=?", (num_id,))
     row = cursor.fetchone()
@@ -241,20 +242,20 @@ def handle_call(call):
     phone, user_id = row
     phone_e164 = clean_phone(phone)
 
-    bot.send_message(call.message.chat.id, f"📞 Number: {phone_e164}")
+    cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (num_id,))
+    conn.commit()
+
+    bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
 
     if user_id not in user_state:
         user_state[user_id] = {'index': 0}
 
     user_state[user_id]['index'] += 1
-    send_current_number(call.message.chat.id, user_id)
-
 
 @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
 def start_calling(call):
     bot.answer_callback_query(call.id)
     send_current_number(call.message.chat.id, call.from_user.id)
-
 
 @bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
 def remove_duplicates(call):
@@ -390,7 +391,11 @@ def start_calling(call):
 {index}/{total}",
         reply_markup=markup
     )
-
+@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
+def start_calling(call):
+    bot.answer_callback_query(call.id)
+    send_current_number(call.message.chat.id, call.from_user.id)
+    
 # ===== SIMPLE POLLING =====
 import time
 from telebot.apihelper import ApiTelegramException
