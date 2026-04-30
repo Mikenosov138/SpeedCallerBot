@@ -374,7 +374,22 @@ def start_calling(call):
         bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
         return
 
-    send_current_number(call.message.chat.id, call.from_user.id)
+    number_id, phone, status = number_data
+
+    markup = telebot.types.InlineKeyboardMarkup()
+    markup.add(
+        telebot.types.InlineKeyboardButton("📞 CALL", callback_data=f"call_{number_id}"),
+        telebot.types.InlineKeyboardButton("⏭ SKIP", callback_data=f"skip_{number_id}"),
+        telebot.types.InlineKeyboardButton("⬅ BACK", callback_data="back_main")
+    )
+
+    bot.send_message(
+        call.message.chat.id,
+        f"📱 {phone}
+
+{index}/{total}",
+        reply_markup=markup
+    )
 
 # ===== SIMPLE POLLING =====
 import time
