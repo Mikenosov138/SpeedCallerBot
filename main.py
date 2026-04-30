@@ -391,11 +391,7 @@ def start_calling(call):
 {index}/{total}",
         reply_markup=markup
     )
-@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
-def start_calling(call):
-    bot.answer_callback_query(call.id)
-    send_current_number(call.message.chat.id, call.from_user.id)
-    
+
 # ===== SIMPLE POLLING =====
 import time
 from telebot.apihelper import ApiTelegramException
