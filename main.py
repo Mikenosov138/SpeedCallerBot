@@ -75,21 +75,25 @@ def start_handler(message):
 
 # ===== НОРМАЛИЗАЦИЯ НОМЕРОВ ЛЮБОЙ СТРАНЫ =====
 def normalize_phone(phone):
-    """+79123456789 из любого формата"""
-    clean = re.sub(r'[^\d+]', '', str(phone))  # Убираем всё кроме цифр/+
-    if len(clean) < 8:
-        return None
-    
-    # Россия 8→7
-    if clean.startswith('8') and len(clean) == 11:
-        clean = '7' + clean[1:]
-    
-    # Добавляем +
-    if not clean.startswith('+'):
-        clean = '+' + clean
-    
-    return clean[-15:]  # E.164 формат
+    """Приводит номер к формату +XXXXXXXXXXX"""
+    clean = re.sub(r"[^d+]", "", str(phone)).strip()
 
+    if not clean:
+        return None
+
+    if clean.startswith("8") and len(clean) == 11:
+        clean = "7" + clean[1:]
+
+    if not clean.startswith("+"):
+        clean = "+" + re.sub(r"[^d]", "", clean)
+    else:
+        clean = "+" + re.sub(r"[^d]", "", clean)
+
+    if len(clean) < 8 or len(clean) > 16:
+        return None
+
+    return clean
+    
 # ===== ИМПОРТ EXCEL/TEXT =====
 def import_numbers(user_id, data, source="manual"):
     """Импорт с UNIQUE номерами"""
