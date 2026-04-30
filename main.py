@@ -220,85 +220,92 @@ def handle_call(call):
 
     bot.send_message(call.message.chat.id, f"📞 Number: {phone_e164}")
 
+    if user_id not in user_state:
+        user_state[user_id] = {'index': 0}
+
     user_state[user_id]['index'] += 1
     send_current_number(call.message.chat.id, user_id)
 
 
-@bot.callback_query_handler(func=lambda call: True)
-def handle_buttons(call):
-    data = call.data
-    chat_id = call.message.chat.id
+@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
+def start_calling(call):
+    bot.answer_callback_query(call.id)
+    send_current_number(call.message.chat.id, call.from_user.id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
+def remove_duplicates(call):
     user_id = call.from_user.id
 
-    if data == "start_calling":
-        bot.answer_callback_query(call.id)
-        send_current_number(chat_id, user_id)
+    cursor.execute("""
+        DELETE FROM numbers
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM numbers
+            WHERE user_id=?
+            GROUP BY phone
+        ) AND user_id=?
+    """, (user_id, user_id))
+    conn.commit()
 
-    elif data == "remove_duplicates":
-        cursor.execute("""
-            DELETE FROM numbers
-            WHERE id NOT IN (
-                SELECT MIN(id)
-                FROM numbers
-                WHERE user_id=?
-                GROUP BY phone
-            ) AND user_id=?
-        """, (user_id, user_id))
-        conn.commit()
-        bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
+    bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
 
-    elif data == "load_menu":
-        kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-        kb.row(InlineKeyboardButton("↩️ Return to call", callback_data="start_calling"))
-        kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
-        kb.row(InlineKeyboardButton("🧹 Remove duplicates", callback_data="remove_duplicates"))
-        kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
-        bot.edit_message_text("📥 Load numbers:", chat_id, call.message.message_id, reply_markup=kb)
 
-    elif data == "load_excel":
-        bot.answer_callback_query(call.id, "📎 Send Excel (.xlsx)")
-        user_state[user_id] = {'waiting_excel': True}
+@bot.callback_query_handler(func=lambda call: call.data == "load_menu")
+def load_menu(call):
+    kb = InlineKeyboardMarkup()
+    kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
+    kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
+    kb.row(InlineKeyboardButton("↩️ Return to call", callback_data="start_calling"))
+    kb.row(InlineKeyboardButton("🗑️ Clear ALL", callback_data="clear_all"))
+    kb.row(InlineKeyboardButton("🧹 Remove duplicates", callback_data="remove_duplicates"))
+    kb.row(InlineKeyboardButton("↩️ Main Menu", callback_data="back_main"))
 
-    elif data == "load_text":
-        bot.answer_callback_query(call.id, "📝 Send numbers line by line")
-        user_state[user_id] = {'waiting_text': True}
+    bot.edit_message_text(
+        "📥 Load numbers:",
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        reply_markup=kb
+    )
 
-    elif data == "clear_all":
-        cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
-        conn.commit()
-        user_state[user_id] = {'index': 0}
 
-        kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-        kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
-        kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="back_main"))
+@bot.callback_query_handler(func=lambda call: call.data == "load_excel")
+def load_excel(call):
+    bot.answer_callback_query(call.id, "📎 Send Excel (.xlsx)")
+    user_state[call.from_user.id] = {'waiting_excel': True}
 
-        bot.edit_message_text(
-            "🗑️ Numbers cleared!\n\n📥 Upload new numbers:",
-            chat_id,
-            call.message.message_id,
-            reply_markup=kb
-        )
 
-    elif data == "back_main":
-        bot.edit_message_text(
-            WELCOME_TEXT,
-            chat_id,
-            call.message.message_id,
-            reply_markup=main_menu_keyboard()
-        )
+@bot.callback_query_handler(func=lambda call: call.data == "load_text")
+def load_text(call):
+    bot.answer_callback_query(call.id, "📝 Send numbers line by line")
+    user_state[call.from_user.id] = {'waiting_text': True}
 
-    elif data == "skip":
-        user_state[user_id]['index'] += 1
-        bot.answer_callback_query(call.id, "⏭️ Пропущено!")
-        send_current_number(chat_id, user_id)
 
-    elif data == "back":
-        user_state[user_id]['index'] = max(0, user_state[user_id]['index'] - 1)
-        bot.answer_callback_query(call.id, "⬅️ Назад")
-        send_current_number(chat_id, user_id)
+@bot.callback_query_handler(func=lambda call: call.data == "clear_all")
+def clear_all(call):
+    user_id = call.from_user.id
 
+    cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
+    conn.commit()
+    user_state[user_id] = {'index': 0}
+
+    kb = InlineKeyboardMarkup()
+    kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
+    kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
+    kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="back_main"))
+
+    bot.edit_message_text(
+        "🗑️ Numbers cleared!
+
+📥 Upload new numbers:",
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        reply_markup=kb
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "back_main")
+def 
 # ===== ОБРАБОТКА ФАЙЛОВ EXCEL/TEXT =====
 @bot.message_handler(content_types=['document', 'text'])
 def handle_numbers(message):
