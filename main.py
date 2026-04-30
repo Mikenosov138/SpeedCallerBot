@@ -99,19 +99,38 @@ def import_numbers(user_id, data, source="manual"):
     """Импорт с UNIQUE номерами"""
     count_added = 0
     numbers = []
-    
+
     if source == "excel":
         try:
             wb = openpyxl.load_workbook(data)
             for ws in wb.worksheets:
                 for row in ws.iter_rows(values_only=True):
                     for cell in row:
-                        if cell:
-                            numbers.append(str(cell))
+                        if cell is not None and str(cell).strip():
+                            numbers.append(str(cell).strip())
         except:
             return 0
-    else:  # Text
-        numbers = [line.strip() for line in data.split('\n') if line.strip()]
+    else:
+        numbers = [line.strip() for line in data.split("
+") if line.strip()]
+
+    numbers = [normalize_phone(n) for n in numbers]
+    numbers = [n for n in numbers if n]
+    numbers = list(dict.fromkeys(numbers))
+
+    for phone in numbers:
+        try:
+            cursor.execute(
+                "INSERT OR IGNORE INTO numbers (user_id, phone, status) VALUES (?, ?, 'new')",
+                (user_id, phone)
+            )
+            if cursor.rowcount > 0:
+                count_added += 1
+        except:
+            pass
+
+    conn.commit()
+    return count_added
     
     # UNIQUE импорт
     for phone in numbers:
