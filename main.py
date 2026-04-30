@@ -67,16 +67,15 @@ def main_menu_keyboard():
 def start_handler(message):
     delete_last_message(message.chat.id)
     sent = bot.send_message(
-    message.chat.id, WELCOME_TEXT, 
-    reply_markup=None,  # No buttons
-    parse_mode='Markdown'
+        message.chat.id,
+        WELCOME_TEXT,
+        reply_markup=None
     )
     last_messages[message.chat.id] = sent.message_id
 
 # ===== НОРМАЛИЗАЦИЯ НОМЕРОВ ЛЮБОЙ СТРАНЫ =====
 def normalize_phone(phone):
-    """Приводит номер к формату +XXXXXXXXXXX"""
-    clean = re.sub(r"[^d+]", "", str(phone)).strip()
+    clean = re.sub(r"[^\d+]", "", str(phone)).strip()
 
     if not clean:
         return None
@@ -85,9 +84,9 @@ def normalize_phone(phone):
         clean = "7" + clean[1:]
 
     if not clean.startswith("+"):
-        clean = "+" + re.sub(r"[^d]", "", clean)
+        clean = "+" + re.sub(r"[^\d]", "", clean)
     else:
-        clean = "+" + re.sub(r"[^d]", "", clean)
+        clean = "+" + re.sub(r"[^\d]", "", clean)
 
     if len(clean) < 8 or len(clean) > 16:
         return None
@@ -111,8 +110,7 @@ def import_numbers(user_id, data, source="manual"):
         except:
             return 0
     else:
-        numbers = [line.strip() for line in data.split("
-") if line.strip()]
+        numbers = [line.strip() for line in data.splitlines() if line.strip()]
 
     numbers = [normalize_phone(n) for n in numbers]
     numbers = [n for n in numbers if n]
@@ -130,24 +128,6 @@ def import_numbers(user_id, data, source="manual"):
             pass
 
     conn.commit()
-    return count_added
-    
-    # UNIQUE импорт
-    for phone in numbers:
-        norm_phone = normalize_phone(phone)
-        if norm_phone:
-            try:
-                cursor.execute(
-                    "INSERT OR IGNORE INTO numbers (user_id, phone) VALUES (?, ?)",
-                    (user_id, norm_phone)
-                )
-                if cursor.rowcount > 0:
-                    count_added += 1
-            except:
-                pass
-    
-    conn.commit()
-    logger.info(f"User {user_id}: +{count_added} номеров")
     return count_added
 
 import re
@@ -192,13 +172,11 @@ def send_current_number(chat_id, user_id):
     
     number_data, index, total = get_current_number(user_id)
     
-    if not number_data:
-        sent = bot.send_message(
-            chat_id,
-            "📭 **Numbers finished!** ✅ **Numbers loaded!** Press **🚀 START** to begin or **⬅️ BACK/SKIP** to page through... ➕ Load new numbers",
-            reply_markup=main_menu_keyboard(),
-            parse_mode='Markdown'
-        )
+    sent = bot.send_message(
+    chat_id,
+    "📭 Numbers finished! ✅ Numbers loaded! Press 🚀 START to begin or ⬅️ BACK/SKIP to page through... ➕ Load new numbers",
+    reply_markup=main_menu_keyboard()
+)
     else:
         num_id, phone = number_data
         phone_e164 = clean_phone(phone)
@@ -211,7 +189,7 @@ def send_current_number(chat_id, user_id):
         )
         kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="load_menu"))
         
-        text = f'👤 Client: <a href="tel:{phone_e164}">{phone_e164}</a>\nProgress: {index+1}/{total}'
+        text = f"👤 Client: {phone_e164}\nProgress: {index+1}/{total}"
         
         sent = bot.send_message(
             chat_id,
@@ -251,11 +229,6 @@ def handle_call(call):
         user_state[user_id] = {'index': 0}
 
     user_state[user_id]['index'] += 1
-
-@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
-def start_calling(call):
-    bot.answer_callback_query(call.id)
-    send_current_number(call.message.chat.id, call.from_user.id)
 
 @bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
 def remove_duplicates(call):
@@ -329,7 +302,19 @@ def clear_all(call):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
-def 
+def back_main(call):
+    bot.answer_callback_query(call.id)
+
+    kb = InlineKeyboardMarkup()
+    kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
+    kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
+
+    bot.edit_message_text(
+        "📥 Load numbers:",
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        reply_markup=kb
+    )
 # ===== ОБРАБОТКА ФАЙЛОВ EXCEL/TEXT =====
 @bot.message_handler(content_types=['document', 'text'])
 def handle_numbers(message):
