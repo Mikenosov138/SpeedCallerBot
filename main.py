@@ -291,8 +291,12 @@ def clear_all(call):
     kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
     kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="back_main"))
 
-    bot.edit_message_text(
-        "🗑️ Numbers cleared!
+bot.edit_message_text(
+    "🗑️ Numbers cleared!\n\n📥 Upload new numbers:",
+    chat_id=call.message.chat.id,
+    message_id=call.message.message_id,
+    reply_markup=kb
+)
 
 📥 Upload new numbers:",
         chat_id=call.message.chat.id,
