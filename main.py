@@ -298,11 +298,12 @@ bot.edit_message_text(
     reply_markup=kb
 )
 
-📥 Upload new numbers:",
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        reply_markup=kb
-    )
+bot.edit_message_text(
+    "🗑️ Numbers cleared!\n\n📥 Upload new numbers:",
+    chat_id=call.message.chat.id,
+    message_id=call.message.message_id,
+    reply_markup=kb
+)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
