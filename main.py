@@ -169,18 +169,19 @@ def get_current_number(user_id):
 
 def send_current_number(chat_id, user_id):
     delete_last_message(chat_id)
-    
+
     number_data, index, total = get_current_number(user_id)
-    
-    sent = bot.send_message(
-    chat_id,
-    "📭 Numbers finished! ✅ Numbers loaded! Press 🚀 START to begin or ⬅️ BACK/SKIP to page through... ➕ Load new numbers",
-    reply_markup=main_menu_keyboard()
-)
+
+    if not number_data:
+        sent = bot.send_message(
+            chat_id,
+            "📭 Numbers finished! ✅ Numbers loaded! Press 🚀 START to begin or ⬅️ BACK/SKIP to page through... ➕ Load new numbers",
+            reply_markup=main_menu_keyboard()
+        )
     else:
         num_id, phone = number_data
         phone_e164 = clean_phone(phone)
-        
+
         kb = InlineKeyboardMarkup()
         kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
         kb.row(
@@ -188,16 +189,16 @@ def send_current_number(chat_id, user_id):
             InlineKeyboardButton("⬅️ BACK", callback_data="back")
         )
         kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="load_menu"))
-        
+
         text = f"👤 Client: {phone_e164}\nProgress: {index+1}/{total}"
-        
+
         sent = bot.send_message(
             chat_id,
             text,
             reply_markup=kb,
-            parse_mode='HTML'
+            parse_mode="HTML"
         )
-    
+
     last_messages[chat_id] = sent.message_id
     
 # ===== ОБРАБОТЧИК КНОПКИ CALL =====
@@ -264,7 +265,6 @@ def load_menu(call):
         message_id=call.message.message_id,
         reply_markup=kb
     )
-
 
 @bot.callback_query_handler(func=lambda call: call.data == "load_excel")
 def load_excel(call):
