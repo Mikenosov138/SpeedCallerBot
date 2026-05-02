@@ -374,13 +374,11 @@ def start_calling(call):
         telebot.types.InlineKeyboardButton("⬅ BACK", callback_data="back_main")
     )
 
-    bot.send_message(
-        call.message.chat.id,
-        f"📱 {phone}
-
-{index}/{total}",
-        reply_markup=markup
-    )
+bot.send_message(
+    call.message.chat.id,
+    f"📱 {phone}\n\n{index}/{total}",
+    reply_markup=markup
+)
 
 # ===== SIMPLE POLLING =====
 import time
