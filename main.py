@@ -227,9 +227,9 @@ def handle_call(call):
     bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
 
     if user_id not in user_state:
-        user_state[user_id] = {'index': 0}
+        user_state[user_id] = {"index": 0}
 
-    user_state[user_id]['index'] += 1
+    user_state[user_id]["index"] += 1
 
 @bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
 def remove_duplicates(call):
@@ -290,21 +290,6 @@ def clear_all(call):
     kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
     kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
     kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="back_main"))
-
-bot.edit_message_text(
-    "🗑️ Numbers cleared!\n\n📥 Upload new numbers:",
-    chat_id=call.message.chat.id,
-    message_id=call.message.message_id,
-    reply_markup=kb
-)
-
-bot.edit_message_text(
-    "🗑️ Numbers cleared!\n\n📥 Upload new numbers:",
-    chat_id=call.message.chat.id,
-    message_id=call.message.message_id,
-    reply_markup=kb
-)
-
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def back_main(call):
