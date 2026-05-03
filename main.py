@@ -385,6 +385,7 @@ import time
 from telebot.apihelper import ApiTelegramException
 
 bot.remove_webhook()
+time.sleep(1)
 
 while True:
     try:
@@ -397,4 +398,3 @@ while True:
     except Exception:
         time.sleep(3)
         continue
-
