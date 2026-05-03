@@ -231,7 +231,7 @@ def handle_call(call):
     phone_e164 = clean_phone(phone)
 
     cursor.execute("UPDATE numbers SET status='pending' WHERE status='new'")
-conn.commit()
+    conn.commit()
 
     bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
 
