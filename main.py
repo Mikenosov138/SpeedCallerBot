@@ -21,25 +21,28 @@ bot.remove_webhook()  # ✅ Отключаем webhook!
 logger.info("✅ Webhook removed — Polling mode")
 
 # База UNIQUE номеров
-conn = sqlite3.connect("speedcaller_v6.db", check_same_thread=False)
-cursor = conn.cursor()
+def init_db():
+    conn = sqlite3.connect("speedcaller_v6.db", check_same_thread=False)
+    cursor = conn.cursor()
 
-cursor.execute("UPDATE numbers SET status='pending' WHERE status='new'")
-conn.commit()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS numbers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        phone TEXT UNIQUE,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+    conn.commit()
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS numbers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    phone TEXT UNIQUE,
-    status TEXT DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
-""")
-conn.commit()
+    cursor.execute("UPDATE numbers SET status='pending' WHERE status='new'")
+    conn.commit()
 
-cursor.execute("UPDATE numbers SET status='pending' WHERE status='new'")
-conn.commit()
+    return conn, cursor
+
+
+conn, cursor = init_db()
 
 # Состояние
 user_state = {}
