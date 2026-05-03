@@ -23,6 +23,10 @@ logger.info("✅ Webhook removed — Polling mode")
 # База UNIQUE номеров
 conn = sqlite3.connect("speedcaller_v6.db", check_same_thread=False)
 cursor = conn.cursor()
+
+cursor.execute("UPDATE numbers SET status='pending' WHERE status='new'")
+conn.commit()
+
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS numbers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +36,9 @@ CREATE TABLE IF NOT EXISTS numbers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 """)
+conn.commit()
+
+cursor.execute("UPDATE numbers SET status='pending' WHERE status='new'")
 conn.commit()
 
 # Состояние
