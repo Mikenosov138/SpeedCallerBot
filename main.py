@@ -95,7 +95,6 @@ def normalize_phone(phone):
     
 # ===== ИМПОРТ EXCEL/TEXT =====
 def import_numbers(user_id, data, source="manual"):
-    """Импорт с UNIQUE номерами"""
     count_added = 0
     numbers = []
 
@@ -119,7 +118,7 @@ def import_numbers(user_id, data, source="manual"):
     for phone in numbers:
         try:
             cursor.execute(
-                "INSERT OR IGNORE INTO numbers (user_id, phone, status) VALUES (?, ?, 'new')",
+                "INSERT OR IGNORE INTO numbers (user_id, phone, status) VALUES (?, ?, 'pending')",
                 (user_id, phone)
             )
             if cursor.rowcount > 0:
@@ -221,8 +220,8 @@ def handle_call(call):
     phone, user_id = row
     phone_e164 = clean_phone(phone)
 
-    cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (num_id,))
-    conn.commit()
+    cursor.execute("UPDATE numbers SET status='pending' WHERE status='new'")
+conn.commit()
 
     bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
 
