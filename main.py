@@ -1,24 +1,15 @@
-# SpeedCallerBot v6 — 100% РАБОЧИЙ
 import os
-import re
-import sqlite3
-import logging
 import time
-import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import sqlite3
 import openpyxl
-import tempfile
-import requests
-import threading
+from telebot import TeleBot, types
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.apihelper import ApiTelegramException
 
-# Логи
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
-logger = logging.getLogger(__name__)
+TOKEN = "PASTE_YOUR_TOKEN_HERE"
+bot = TeleBot(TOKEN, parse_mode="HTML")
 
-TOKEN = os.getenv("BOT_TOKEN")
-bot = telebot.TeleBot(TOKEN)
-bot.remove_webhook()  # ✅ Отключаем webhook!
-logger.info("✅ Webhook removed — Polling mode")
+user_state = {}
 
 # База UNIQUE номеров
 def init_db():
@@ -41,70 +32,46 @@ def init_db():
 
     return conn, cursor
 
-
 conn, cursor = init_db()
 
-# Состояние
-user_state = {}
-last_messages = {}
-
-WELCOME_TEXT = """
-👋 **SpeedCallerBot**
-
-📞 **Fast client database calling**
-
-**How to use:**
-• 📎 Send **Excel** file (.xlsx) 
-• 📝 Send **Text** numbers (line by line)
-• 📞 **CALL** → dial ✓
-• ⏭️ **SKIP** → next
-• ⬅️ **BACK** → previous
-
-**NO LIMITS!** Send file/message 👇
-"""
-
-def delete_last_message(chat_id):
-    if chat_id in last_messages:
-        try:
-            bot.delete_message(chat_id, last_messages[chat_id])
-        except:
-            pass
-
-def main_menu_keyboard():
-    return None  # No keyboard
-
-@bot.message_handler(commands=['start'])
-def start_handler(message):
-    delete_last_message(message.chat.id)
-    sent = bot.send_message(
-        message.chat.id,
-        WELCOME_TEXT,
-        reply_markup=None
-    )
-    last_messages[message.chat.id] = sent.message_id
-
-# ===== НОРМАЛИЗАЦИЯ НОМЕРОВ ЛЮБОЙ СТРАНЫ =====
 def normalize_phone(phone):
-    clean = re.sub(r"[^\d+]", "", str(phone)).strip()
-
-    if not clean:
+    if phone is None:
         return None
-
-    if clean.startswith("8") and len(clean) == 11:
-        clean = "7" + clean[1:]
-
-    if not clean.startswith("+"):
-        clean = "+" + re.sub(r"[^\d]", "", clean)
-    else:
-        clean = "+" + re.sub(r"[^\d]", "", clean)
-
-    if len(clean) < 8 or len(clean) > 16:
+    s = str(phone).strip()
+    if not s:
         return None
+    digits = "".join(ch for ch in s if ch.isdigit() or ch == "+")
+    digits = digits.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    if digits.startswith("8") and len(digits) == 11:
+        digits = "+7" + digits[1:]
+    elif digits.startswith("7") and len(digits) == 11:
+        digits = "+" + digits
+    elif digits.startswith("+") and len(digits) >= 10:
+        pass
+    elif digits.isdigit() and len(digits) >= 10:
+        digits = "+" + digits
+    return digits
 
-    return clean
-    
-# ===== ИМПОРТ EXCEL/TEXT =====
-def import_numbers(user_id, data, source="manual"):
+def get_user_numbers(user_id):
+    cursor.execute(
+        "SELECT id, phone FROM numbers WHERE user_id=? AND status='pending' ORDER BY id",
+        (user_id,)
+    )
+    return cursor.fetchall()
+
+def get_number_by_id(num_id):
+    cursor.execute("SELECT id, phone, user_id, status FROM numbers WHERE id=?", (num_id,))
+    return cursor.fetchone()
+
+def count_pending(user_id):
+    cursor.execute(
+        "SELECT COUNT(*) FROM numbers WHERE user_id=? AND status='pending'",
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    return row[0] if row else 0
+
+def import_numbers(user_id, data, source="text"):
     count_added = 0
     numbers = []
 
@@ -139,111 +106,11 @@ def import_numbers(user_id, data, source="manual"):
     conn.commit()
     return count_added
 
-import re
-
-def clean_phone(phone):
-    phone = str(phone).strip()
-    phone = re.sub(r"[^\d+]", "", phone)
-    if not phone.startswith("+"):
-        phone = "+" + phone
-    return phone
-
-
-def get_user_numbers(user_id):
-    """Pending номера пользователя"""
-    cursor.execute("""
-        SELECT id, phone FROM numbers 
-        WHERE user_id=? AND status='pending' 
-        ORDER BY created_at ASC
-    """, (user_id,))
-    return cursor.fetchall()
-
-
-def get_current_number(user_id):
-    """Текущий номер + прогресс"""
-    if user_id not in user_state:
-        user_state[user_id] = {'index': 0}
-    
-    numbers = get_user_numbers(user_id)
-    if not numbers:
-        return None, None, 0
-    
-    index = user_state[user_id]['index']
-    if index >= len(numbers):
-        user_state[user_id]['index'] = 0
-        index = 0
-    
-    return numbers[index], index, len(numbers)
-
-
-def send_current_number(chat_id, user_id):
-    delete_last_message(chat_id)
-
-    number_data, index, total = get_current_number(user_id)
-
-    if not number_data:
-        sent = bot.send_message(
-            chat_id,
-            "📭 Numbers finished! ✅ Numbers loaded! Press 🚀 START to begin or ⬅️ BACK/SKIP to page through... ➕ Load new numbers",
-            reply_markup=main_menu_keyboard()
-        )
-    else:
-        num_id, phone = number_data
-        phone_e164 = clean_phone(phone)
-
-        kb = InlineKeyboardMarkup()
-        kb.row(InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"))
-        kb.row(
-            InlineKeyboardButton("⏭️ SKIP", callback_data="skip"),
-            InlineKeyboardButton("⬅️ BACK", callback_data="back")
-        )
-        kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="load_menu"))
-
-        text = f"👤 Client: {phone_e164}\nProgress: {index+1}/{total}"
-
-        sent = bot.send_message(
-            chat_id,
-            text,
-            reply_markup=kb,
-            parse_mode="HTML"
-        )
-
-    last_messages[chat_id] = sent.message_id
-    
-# ===== ОБРАБОТЧИК КНОПКИ CALL =====
-@bot.callback_query_handler(func=lambda call: call.data.startswith("call_"))
-def handle_call(call):
-    bot.answer_callback_query(call.id)
-
-    try:
-        num_id = int(call.data.split("_", 1)[1])
-    except:
-        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
-        return
-
-    cursor.execute("SELECT phone, user_id FROM numbers WHERE id=?", (num_id,))
-    row = cursor.fetchone()
-    if not row:
-        bot.send_message(call.message.chat.id, "❌ Number not found.")
-        return
-
-    phone, user_id = row
-    phone_e164 = clean_phone(phone)
-
-    cursor.execute("UPDATE numbers SET status='pending' WHERE status='new'")
+def clear_user_numbers(user_id):
+    cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
     conn.commit()
 
-    bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
-
-    if user_id not in user_state:
-        user_state[user_id] = {"index": 0}
-
-    user_state[user_id]["index"] += 1
-
-@bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
-def remove_duplicates(call):
-    user_id = call.from_user.id
-
+def remove_user_duplicates(user_id):
     cursor.execute("""
         DELETE FROM numbers
         WHERE id NOT IN (
@@ -255,8 +122,34 @@ def remove_duplicates(call):
     """, (user_id, user_id))
     conn.commit()
 
-    bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
+def mark_number_called(num_id):
+    cursor.execute("UPDATE numbers SET status='called' WHERE id=?", (num_id,))
+    conn.commit()
 
+def mark_number_skipped(num_id):
+    cursor.execute("UPDATE numbers SET status='skipped' WHERE id=?", (num_id,))
+    conn.commit()
+
+def clean_phone(phone):
+    s = str(phone).strip()
+    digits = "".join(ch for ch in s if ch.isdigit() or ch == "+")
+    digits = digits.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    if digits.startswith("8") and len(digits) == 11:
+        return "+7" + digits[1:]
+    if digits.startswith("7") and len(digits) == 11 and not digits.startswith("+"):
+        return "+" + digits
+    if digits.startswith("+"):
+        return digits
+    if digits.isdigit():
+        return "+" + digits
+    return digits
+
+@bot.callback_query_handler(func=lambda call: call.data == "remove_duplicates")
+def remove_duplicates(call):
+    user_id = call.from_user.id
+    remove_user_duplicates(user_id)
+    bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
+    bot.answer_callback_query(call.id, "🧹 Duplicates removed!")
 
 @bot.callback_query_handler(func=lambda call: call.data == "load_menu")
 def load_menu(call):
@@ -277,124 +170,351 @@ def load_menu(call):
 
 @bot.callback_query_handler(func=lambda call: call.data == "load_excel")
 def load_excel(call):
-    bot.answer_callback_query(call.id, "📎 Send Excel (.xlsx)")
-    user_state[call.from_user.id] = {'waiting_excel': True}
-
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, "📎 Send Excel file (.xlsx)")
 
 @bot.callback_query_handler(func=lambda call: call.data == "load_text")
 def load_text(call):
-    bot.answer_callback_query(call.id, "📝 Send numbers line by line")
-    user_state[call.from_user.id] = {'waiting_text': True}
-
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, "📝 Send numbers as text, one per line")
 
 @bot.callback_query_handler(func=lambda call: call.data == "clear_all")
 def clear_all(call):
     user_id = call.from_user.id
-
-    cursor.execute("DELETE FROM numbers WHERE user_id=?", (user_id,))
-    conn.commit()
-    user_state[user_id] = {'index': 0}
-
-    kb = InlineKeyboardMarkup()
-    kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-    kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
-    kb.row(InlineKeyboardButton("🏠 Main menu", callback_data="back_main"))
-
-    bot.edit_message_text(
-        "🗑️ Numbers cleared!\n\n📥 Upload new numbers:",
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        reply_markup=kb
-    )
+    clear_user_numbers(user_id)
+    bot.answer_callback_query(call.id, "🗑️ Cleared!")
+    bot.send_message(call.message.chat.id, "🗑️ All your numbers were deleted.")
 
 @bot.callback_query_handler(func=lambda call: call.data == "back_main")
 def back_main(call):
     bot.answer_callback_query(call.id)
-
     kb = InlineKeyboardMarkup()
-    kb.row(InlineKeyboardButton("📊 Excel", callback_data="load_excel"))
-    kb.row(InlineKeyboardButton("📝 Text", callback_data="load_text"))
-
+    kb.row(InlineKeyboardButton("▶️ START", callback_data="start_calling"))
+    kb.row(InlineKeyboardButton("📥 Load numbers", callback_data="load_menu"))
     bot.edit_message_text(
-        "📥 Load numbers:",
+        "Menu",
         chat_id=call.message.chat.id,
         message_id=call.message.message_id,
         reply_markup=kb
     )
-# ===== ОБРАБОТКА ФАЙЛОВ EXCEL/TEXT =====
-@bot.message_handler(content_types=['document', 'text'])
-def handle_numbers(message):
-    """📎 Excel + 📝 Text — ЛЮБОЙ файл/текст"""
+
+@bot.message_handler(content_types=['document'])
+def handle_document(message):
     user_id = message.from_user.id
+    file_info = bot.get_file(message.document.file_id)
+    downloaded = bot.download_file(file_info.file_path)
 
-    if message.document and message.document.file_name.endswith('.xlsx'):
-        try:
-            file_info = bot.get_file(message.document.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
+    filename = message.document.file_name.lower()
+    if not filename.endswith(".xlsx"):
+        bot.send_message(message.chat.id, "❌ Only .xlsx files are supported.")
+        return
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
-                tmp.write(downloaded_file)
-                tmp_path = tmp.name
+    tmp_path = f"tmp_{message.document.file_unique_id}.xlsx"
+    with open(tmp_path, "wb") as f:
+        f.write(downloaded)
 
-            count = import_numbers(user_id, tmp_path, "excel")
-            user_state[user_id] = {'index': 0}
-        except:
-            bot.reply_to(message, "❌ Excel error!")
-            return
-    else:
-        if not message.text:
-            return
-        count = import_numbers(user_id, message.text, "text")
-        user_state[user_id] = {'index': 0}
+    added = import_numbers(user_id, tmp_path, source="excel")
+    try:
+        os.remove(tmp_path)
+    except:
+        pass
 
+    total = count_pending(user_id)
+    bot.send_message(message.chat.id, f"✅ {added} numbers imported. Total pending: {total}")
+
+@bot.message_handler(content_types=['text'])
+def handle_text(message):
+    user_id = message.from_user.id
+    text = message.text.strip()
+
+    if text in ["/start", "START", "start"]:
+        return
+
+    if "\n" in text or text.startswith("+") or text[:1].isdigit():
+        added = import_numbers(user_id, text, source="text")
+        total = count_pending(user_id)
+        bot.send_message(message.chat.id, f"✅ {added} numbers imported. Total pending: {total}")
+        @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
+def start_calling(call):
+    bot.answer_callback_query(call.id)
+
+    user_id = call.from_user.id
+    numbers = get_user_numbers(user_id)
+
+    if not numbers:
+        bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
+        return
+
+    if user_id not in user_state:
+        user_state[user_id] = {"index": 0}
+
+    user_state[user_id]["index"] = 0
+
+    num_id, phone = numbers[0]
+    phone_e164 = clean_phone(phone)
+
+    bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("call_"))
+def handle_call(call):
+    bot.answer_callback_query(call.id)
+
+    try:
+        num_id = int(call.data.split("_", 1)[1])
+    except:
+        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
+        return
+
+    row = get_number_by_id(num_id)
+    if not row:
+        bot.send_message(call.message.chat.id, "❌ Number not found.")
+        return
+
+    _, phone, user_id, status = row
+    phone_e164 = clean_phone(phone)
+
+    mark_number_called(num_id)
+
+    bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
+
+    if user_id not in user_state:
+        user_state[user_id] = {"index": 0}
+
+    user_state[user_id]["index"] += 1
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("skip_"))
+def handle_skip(call):
+    bot.answer_callback_query(call.id)
+
+    try:
+        num_id = int(call.data.split("_", 1)[1])
+    except:
+        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
+        return
+
+    row = get_number_by_id(num_id)
+    if not row:
+        bot.send_message(call.message.chat.id, "❌ Number not found.")
+        return
+
+    _, phone, user_id, status = row
+    mark_number_skipped(num_id)
+
+    numbers = get_user_numbers(user_id)
+    if not numbers:
+        bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
+        return
+
+    current_index = user_state.get(user_id, {}).get("index", 0)
+    if current_index >= len(numbers):
+        current_index = len(numbers) - 1
+
+    next_index = current_index + 1
+    if next_index >= len(numbers):
+        bot.send_message(call.message.chat.id, "✅ End of list.")
+        return
+
+    user_state.setdefault(user_id, {})["index"] = next_index
+    next_num_id, next_phone = numbers[next_index]
+    bot.send_message(call.message.chat.id, f"📞 {clean_phone(next_phone)}")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("back_"))
+def handle_back(call):
+    bot.answer_callback_query(call.id)
+
+    try:
+        num_id = int(call.data.split("_", 1)[1])
+    except:
+        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
+        return
+
+    row = get_number_by_id(num_id)
+    if not row:
+        bot.send_message(call.message.chat.id, "❌ Number not found.")
+        return
+
+    _, phone, user_id, status = row
+
+    numbers = get_user_numbers(user_id)
+    if not numbers:
+        bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
+        return
+
+    current_index = user_state.get(user_id, {}).get("index", 0)
+    prev_index = current_index - 1
+    if prev_index < 0:
+        bot.send_message(call.message.chat.id, "⏮️ Already first number.")
+        return
+
+    user_state.setdefault(user_id, {})["index"] = prev_index
+    prev_num_id, prev_phone = numbers[prev_index]
+    bot.send_message(call.message.chat.id, f"📞 {clean_phone(prev_phone)}")
+
+
+if __name__ == "__main__":
+    bot.remove_webhook()
+    time.sleep(1)
+    bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
+
+def build_number_markup(num_id):
     kb = InlineKeyboardMarkup()
-    kb.row(InlineKeyboardButton("🚀 START", callback_data="start_calling"))
-
-    bot.reply_to(
-        message,
-        f"✅ {count} numbers loaded! Press 🚀 START to begin calling or add more numbers!",
-        reply_markup=kb
+    kb.row(
+        InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"),
+        InlineKeyboardButton("⏭ SKIP", callback_data=f"skip_{num_id}"),
+        InlineKeyboardButton("⬅ BACK", callback_data=f"back_{num_id}")
     )
+    return kb
 
-# ===== START CALLING =====
+
 @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
 def start_calling(call):
     bot.answer_callback_query(call.id)
 
-    number_data, index, total = get_current_number(call.from_user.id)
-    if not number_data:
+    user_id = call.from_user.id
+    numbers = get_user_numbers(user_id)
+
+    if not numbers:
         bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
         return
 
-    number_id, phone = number_data
+    user_state[user_id] = {"index": 0}
 
-    markup = InlineKeyboardMarkup()
-    markup.row(
-        InlineKeyboardButton("📞 CALL", callback_data=f"call_{number_id}"),
-        InlineKeyboardButton("⏭ SKIP", callback_data=f"skip_{number_id}"),
-        InlineKeyboardButton("⬅ BACK", callback_data="back_main")
-    )
+    num_id, phone = numbers[0]
+    phone_e164 = clean_phone(phone)
 
     bot.send_message(
         call.message.chat.id,
-        f"📱 {phone}\n\n{index}/{total}",
-        reply_markup=markup
+        f"📞 {phone_e164}",
+        reply_markup=build_number_markup(num_id)
     )
-# ===== SIMPLE POLLING =====
-import time
-from telebot.apihelper import ApiTelegramException
 
-bot.remove_webhook()
-time.sleep(1)
 
-while True:
+@bot.callback_query_handler(func=lambda call: call.data.startswith("call_"))
+def handle_call(call):
+    bot.answer_callback_query(call.id)
+
     try:
-        bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
-    except ApiTelegramException as e:
-        if "409" in str(e):
-            time.sleep(3)
-            continue
-        raise
-    except Exception:
-        time.sleep(3)
-        continue
+        num_id = int(call.data.split("_", 1)[1])
+    except:
+        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
+        return
+
+    row = get_number_by_id(num_id)
+    if not row:
+        bot.send_message(call.message.chat.id, "❌ Number not found.")
+        return
+
+    _, phone, user_id, status = row
+    phone_e164 = clean_phone(phone)
+
+    mark_number_called(num_id)
+
+    bot.send_message(
+        call.message.chat.id,
+        f"📞 {phone_e164}",
+        reply_markup=build_number_markup(num_id)
+    )
+
+    user_state.setdefault(user_id, {})
+    user_state[user_id]["index"] = user_state[user_id].get("index", 0) + 1
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("skip_"))
+def handle_skip(call):
+    bot.answer_callback_query(call.id)
+
+    try:
+        num_id = int(call.data.split("_", 1)[1])
+    except:
+        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
+        return
+
+    row = get_number_by_id(num_id)
+    if not row:
+        bot.send_message(call.message.chat.id, "❌ Number not found.")
+        return
+
+    _, phone, user_id, status = row
+    mark_number_skipped(num_id)
+
+    numbers = get_user_numbers(user_id)
+    if not numbers:
+        bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
+        return
+
+    current_index = 0
+    for i, (nid, ph) in enumerate(numbers):
+        if nid == num_id:
+            current_index = i
+            break
+
+    next_index = current_index + 1
+    if next_index >= len(numbers):
+        bot.send_message(call.message.chat.id, "✅ End of list.")
+        return
+
+    next_num_id, next_phone = numbers[next_index]
+    user_state.setdefault(user_id, {})
+    user_state[user_id]["index"] = next_index
+
+    bot.send_message(
+        call.message.chat.id,
+        f"📞 {clean_phone(next_phone)}",
+        reply_markup=build_number_markup(next_num_id)
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("back_"))
+def handle_back(call):
+    bot.answer_callback_query(call.id)
+
+    try:
+        num_id = int(call.data.split("_", 1)[1])
+    except:
+        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
+        return
+
+    row = get_number_by_id(num_id)
+    if not row:
+        bot.send_message(call.message.chat.id, "❌ Number not found.")
+        return
+
+    _, phone, user_id, status = row
+
+    numbers = get_user_numbers(user_id)
+    if not numbers:
+        bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
+        return
+
+    current_index = 0
+    for i, (nid, ph) in enumerate(numbers):
+        if nid == num_id:
+            current_index = i
+            break
+
+    prev_index = current_index - 1
+    if prev_index < 0:
+        bot.send_message(call.message.chat.id, "⏮️ Already first number.")
+        return
+
+    prev_num_id, prev_phone = numbers[prev_index]
+    user_state.setdefault(user_id, {})
+    user_state[user_id]["index"] = prev_index
+
+    bot.send_message(
+        call.message.chat.id,
+        f"📞 {clean_phone(prev_phone)}",
+        reply_markup=build_number_markup(prev_num_id)
+    )
+if __name__ == "__main__":
+    bot.remove_webhook()
+    time.sleep(1)
+
+    bot.infinity_polling(
+        skip_pending=True,
+        timeout=20,
+        long_polling_timeout=20
+    )
