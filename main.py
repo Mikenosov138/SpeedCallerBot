@@ -235,6 +235,7 @@ def handle_text(message):
         total = count_pending(user_id)
         bot.send_message(message.chat.id, f"✅ {added} numbers imported. Total pending: {total}")
         @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
+
 def start_calling(call):
     bot.answer_callback_query(call.id)
 
