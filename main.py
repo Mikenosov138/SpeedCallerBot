@@ -510,6 +510,8 @@ def handle_back(call):
         f"📞 {clean_phone(prev_phone)}",
         reply_markup=build_number_markup(prev_num_id)
     )
+
+
 if __name__ == "__main__":
     bot.remove_webhook()
     time.sleep(1)
