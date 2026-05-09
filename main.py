@@ -6,7 +6,7 @@ from telebot import TeleBot, types
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from telebot.apihelper import ApiTelegramException
 
-TOKEN = "PASTE_YOUR_TOKEN_HERE"
+TOKEN = os.getenv("TOKEN")
 bot = TeleBot(TOKEN, parse_mode="HTML")
 
 user_state = {}
