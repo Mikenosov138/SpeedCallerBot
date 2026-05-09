@@ -236,6 +236,17 @@ def handle_text(message):
         bot.send_message(message.chat.id, f"✅ {added} numbers imported. Total pending: {total}")
         @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
 
+def build_number_markup(num_id):
+    kb = InlineKeyboardMarkup()
+    kb.row(
+        InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"),
+        InlineKeyboardButton("⏭ SKIP", callback_data=f"skip_{num_id}"),
+        InlineKeyboardButton("⬅ BACK", callback_data=f"back_{num_id}")
+    )
+    return kb
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
 def start_calling(call):
     bot.answer_callback_query(call.id)
 
@@ -246,15 +257,16 @@ def start_calling(call):
         bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
         return
 
-    if user_id not in user_state:
-        user_state[user_id] = {"index": 0}
-
-    user_state[user_id]["index"] = 0
+    user_state[user_id] = {"index": 0}
 
     num_id, phone = numbers[0]
     phone_e164 = clean_phone(phone)
 
-    bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
+    bot.send_message(
+        call.message.chat.id,
+        f"📞 {phone_e164}",
+        reply_markup=build_number_markup(num_id)
+    )
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("call_"))
