@@ -234,7 +234,8 @@ def handle_text(message):
         added = import_numbers(user_id, text, source="text")
         total = count_pending(user_id)
         bot.send_message(message.chat.id, f"✅ {added} numbers imported. Total pending: {total}")
-        @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
+@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
+def start_calling(call):
 
 def build_number_markup(num_id):
     kb = InlineKeyboardMarkup()
@@ -244,6 +245,12 @@ def build_number_markup(num_id):
         InlineKeyboardButton("⬅ BACK", callback_data=f"back_{num_id}")
     )
     return kb
+
+
+if "\n" in text or text.startswith("+") or text[:1].isdigit():
+    added = import_numbers(user_id, text, source="text")
+    total = count_pending(user_id)
+    bot.send_message(message.chat.id, f"✅ {added} numbers imported. Total pending: {total}")
 
 
 @bot.callback_query_handler(func=lambda call: call.data == "start_calling")
@@ -257,37 +264,13 @@ def start_calling(call):
         bot.send_message(call.message.chat.id, "📭 No numbers loaded.")
         return
 
-    user_state[user_id] = {"index": 0}
+    if user_id not in user_state:
+        user_state[user_id] = {"index": 0}
+
+    user_state[user_id]["index"] = 0
 
     num_id, phone = numbers[0]
     phone_e164 = clean_phone(phone)
-
-    bot.send_message(
-        call.message.chat.id,
-        f"📞 {phone_e164}",
-        reply_markup=build_number_markup(num_id)
-    )
-
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("call_"))
-def handle_call(call):
-    bot.answer_callback_query(call.id)
-
-    try:
-        num_id = int(call.data.split("_", 1)[1])
-    except:
-        bot.send_message(call.message.chat.id, "❌ Invalid number id.")
-        return
-
-    row = get_number_by_id(num_id)
-    if not row:
-        bot.send_message(call.message.chat.id, "❌ Number not found.")
-        return
-
-    _, phone, user_id, status = row
-    phone_e164 = clean_phone(phone)
-
-    mark_number_called(num_id)
 
     bot.send_message(call.message.chat.id, f"📞 {phone_e164}")
 
