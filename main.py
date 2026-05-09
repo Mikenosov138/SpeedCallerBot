@@ -231,11 +231,14 @@ def handle_text(message):
         return
 
     if "\n" in text or text.startswith("+") or text[:1].isdigit():
-        added = import_numbers(user_id, text, source="text")
-        total = count_pending(user_id)
-        bot.send_message(message.chat.id, f"✅ {added} numbers imported. Total pending: {total}")
-        
-def build_number_markup(num_id):
+    added = import_numbers(user_id, text, source="text")
+    total = count_pending(user_id)
+    bot.send_message(message.chat.id, f"✅ {added} numbers imported. Total pending: {total}")
+
+
+@bot.callback_query_handler(func=lambda call: call.data == "start_calling")
+def start_calling(call):
+    
     kb = InlineKeyboardMarkup()
     kb.row(
         InlineKeyboardButton("📞 CALL", callback_data=f"call_{num_id}"),
