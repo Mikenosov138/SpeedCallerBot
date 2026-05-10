@@ -9,7 +9,6 @@ from telebot.apihelper import ApiTelegramException
 
 TOKEN = os.getenv("BOT_TOKEN")
 bot = TeleBot(TOKEN, parse_mode="HTML")
-print(repr(TOKEN))
 
 user_state = {}
 
