@@ -387,6 +387,9 @@ def handle_text(message):
         return
 
 if __name__ == "__main__":
-    bot.remove_webhook()
-    time.sleep(1)
-    bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
+    try:
+        bot.remove_webhook()
+        time.sleep(1)
+        bot.infinity_polling(skip_pending=True, timeout=20, long_polling_timeout=20)
+    except Exception as e:
+        print(f"Bot crashed: {e}")
